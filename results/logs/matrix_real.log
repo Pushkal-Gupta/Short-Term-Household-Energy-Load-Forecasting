@@ -1,0 +1,53 @@
+13:12:41 INFO Preprocessing: 5528 seen, 4034 eligible, 100 selected -> /Users/pushkalgupta/Desktop/Short-Term-Household-Energy-Load-Forecasting/data/processed
+6 run(s) to do with 8 worker(s)
+[1/6] T_hafedprox_mu0.1 seed 42: test MAE 0.0886 (1892 s) | elapsed 31.6 min
+[2/6] T_hafedprox_mu1.0 seed 42: test MAE 0.0905 (1896 s) | elapsed 31.6 min
+[3/6] T_fedprox_mu0.1 seed 42: test MAE 0.0890 (1897 s) | elapsed 31.7 min
+[4/6] T_fedprox_mu0.01 seed 42: test MAE 0.0865 (1900 s) | elapsed 31.7 min
+[5/6] T_hafedprox_mu0.01 seed 42: test MAE 0.0866 (1901 s) | elapsed 31.7 min
+[6/6] T_fedprox_mu0.001 seed 42: test MAE 0.0857 (1902 s) | elapsed 31.7 min
+tuning: {
+  "mu_fedprox": {
+    "value": 0.001,
+    "val_mae": 0.07258593022721796,
+    "run": "T_fedprox_mu0.001"
+  },
+  "mu_hafedprox": {
+    "value": 0.01,
+    "val_mae": 0.07331729458042105,
+    "run": "T_hafedprox_mu0.01"
+  }
+}
+75 run(s) to do with 8 worker(s)
+[1/75] E0_naive seed 44: test MAE 0.1332 (0 s) | elapsed 0.1 min
+[2/75] E0_naive seed 43: test MAE 0.1332 (0 s) | elapsed 0.1 min
+[3/75] E0_naive seed 42: test MAE 0.1332 (0 s) | elapsed 0.1 min
+[4/75] E2_centralized seed 44: test MAE 0.0809 (595 s) | elapsed 10.0 min
+[5/75] E1_local seed 43: test MAE 0.0837 (1031 s) | elapsed 17.3 min
+[6/75] E1_local seed 42: test MAE 0.0838 (1076 s) | elapsed 18.0 min
+[7/75] E1_local seed 44: test MAE 0.0844 (1107 s) | elapsed 18.5 min
+[8/75] E2_centralized seed 42: test MAE 0.0809 (1357 s) | elapsed 22.7 min
+[9/75] E2_centralized seed 43: test MAE 0.0814 (1782 s) | elapsed 29.8 min
+[10/75] E3_fedavg_iid seed 42: test MAE 0.0848 (2693 s) | elapsed 45.0 min
+[11/75] E3_fedavg_iid seed 43: test MAE 0.0863 (2732 s) | elapsed 45.6 min
+[12/75] E3_fedavg_iid seed 44: test MAE 0.0847 (2743 s) | elapsed 55.7 min
+[13/75] E4_fedavg_moderate seed 42: test MAE 0.0864 (2776 s) | elapsed 64.3 min
+[14/75] E4_fedavg_moderate seed 43: test MAE 0.0857 (2756 s) | elapsed 65.5 min
+[15/75] E4_fedavg_moderate seed 44: test MAE 0.0862 (2766 s) | elapsed 67.6 min
+[16/75] E5_fedprox_moderate seed 42: test MAE 0.0860 (2937 s) | elapsed 147.8 min
+[17/75] E5_fedprox_moderate seed 43: test MAE 0.0857 (3037 s) | elapsed 156.6 min
+[18/75] E6_fedavg_strong seed 42: test MAE 0.0856 (2915 s) | elapsed 170.4 min
+[19/75] E5_fedprox_moderate seed 44: test MAE 0.0858 (3073 s) | elapsed 172.4 min
+[20/75] E8_fedavg_partial seed 42: test MAE 0.0846 (1300 s) | elapsed 178.3 min
+[21/75] E6_fedavg_strong seed 43: test MAE 0.0860 (2910 s) | elapsed 180.4 min
+[22/75] E6_fedavg_strong seed 44: test MAE 0.0854 (2950 s) | elapsed 188.9 min
+[23/75] E8_fedavg_partial seed 43: test MAE 0.0853 (1291 s) | elapsed 191.9 min
+[24/75] E7_fedprox_strong seed 42: test MAE 0.0857 (3118 s) | elapsed 192.1 min
+[25/75] E8_fedavg_partial seed 44: test MAE 0.0848 (1211 s) | elapsed 192.6 min
+[26/75] E7_fedprox_strong seed 43: test MAE 0.0856 (3144 s) | elapsed 193.2 min
+[27/75] E7_fedprox_strong seed 44: test MAE 0.0860 (3105 s) | elapsed 199.6 min
+[28/75] E9_fedprox_partial seed 42: test MAE 0.0859 (1473 s) | elapsed 202.8 min
+[29/75] E9_fedprox_partial seed 43: test MAE 0.0854 (1483 s) | elapsed 205.1 min
+[30/75] E9_fedprox_partial seed 44: test MAE 0.0856 (1403 s) | elapsed 212.3 min
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/multiprocessing/resource_tracker.py:475: UserWarning: resource_tracker: There appear to be 5 leaked semaphore objects to clean up at shutdown: {'/mp-00fl2iyk', '/mp-lv03aziy', '/mp-y7llffml', '/mp-ledp9pu2', '/mp-n6ikb75i'}
+  warnings.warn(

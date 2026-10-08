@@ -1,0 +1,72 @@
+# Default configuration — REAL Low Carbon London data.
+# Every value can be overridden on the command line:  --set train.lr=0.0005 fed.rounds=30
+#
+# Paths are relative to the repository root.
+
+experiment_tag: real          # written into every results file; "demo" for synthetic runs
+results_dir: results
+
+data:
+  source: lcl                 # lcl | synthetic
+  raw_dir: data/raw           # where the LCL CSVs (or the downloaded zip) live
+  processed_dir: data/processed
+  household_info: null        # optional Kaggle "informations_households.csv" (ACORN labels)
+  tariff: Std                 # keep standard-tariff homes only (ToU homes had a dynamic tariff in 2013)
+  start: "2013-01-01"         # study period (inclusive)
+  end: "2014-01-01"           # study period (exclusive)
+  train_end: "2013-09-01"     # train  = [start, train_end)
+  val_end: "2013-11-01"       # val    = [train_end, val_end) ; test = [val_end, end)
+  min_coverage: 0.95          # fraction of non-missing half-hours required in the study period
+  num_households: 100         # NUM_HOUSEHOLDS — stratified (by mean-load quintile) seeded sample
+  selection_seed: 42          # fixed cohort: the same homes for every training seed
+  max_gap_steps: 4            # interpolate gaps of <= 4 half-hours (2 h); longer gaps stay missing
+  max_kwh_per_hh: 10.0        # readings above this are physically implausible for a home -> NaN
+  interval: 30min
+
+window:
+  input_window: 48            # INPUT_WINDOW: 24 h of half-hourly history
+  horizon: 1                  # FORECAST_HORIZON: predict t+1 (next 30 min)
+  calendar_features: false    # add sin/cos time-of-day and day-of-week channels (ablation only)
+
+model:                        # identical for EVERY arm (local / centralised / FedAvg / FedProx)
+  hidden_size: 64
+  num_layers: 1
+  dropout: 0.0
+
+train:
+  batch_size: 256
+  lr: 0.001
+  max_epochs: 30              # centralised & local-only: upper bound, early stopping on validation
+  patience: 4
+  device: auto                # auto (cuda > mps > cpu) | cpu | cuda | mps
+  eval_batch_size: 4096
+
+partition:
+  mode: community             # community (several homes per client) | household (1 home = 1 client)
+  households_per_client: 5    # community mode only -> num_clients = num_households / households_per_client
+  strategy: iid               # iid | dirichlet | cluster
+  alpha: 0.3                  # Dirichlet concentration (dirichlet strategy): smaller = more non-IID
+  num_profile_clusters: 5     # k-means clusters over train-split load shapes
+
+fed:
+  backend: sim                # sim (deterministic in-process) | flower
+  algorithm: fedavg           # fedavg | fedprox | hafedprox
+  rounds: 30                  # FED_ROUNDS (30 rounds x 1 local epoch = the 30-epoch budget of the centralised arm)
+  local_epochs: 1             # LOCAL_EPOCHS
+  client_fraction: 1.0        # CLIENT_FRACTION
+  min_clients: 2
+  mu: 0.01                    # FEDPROX_MU (fixed-mu FedProx) / mu_0 for HA-FedProx
+  ha_mu_min: 0.0001
+  ha_mu_max: 1.0
+  straggler_prob: 0.0         # probability a selected client is a straggler
+  straggler_min_work: 0.1     # stragglers finish U(min_work, 1) of their local work
+  drop_stragglers: null       # null -> FedAvg drops, FedProx/HA-FedProx keep partial work
+  update_precision: float32   # float32 | float16 (communication ablation)
+  finetune_epochs: 1          # personalisation evaluation (FedAvg-FT); 0 disables
+
+eval:
+  mape_min_actual: 0.05       # MAPE computed only where actual >= this (kWh per half-hour)
+  epsilon_pct: 10.0           # B@eps / R@eps: within eps % of centralised validation MAE
+
+seed: 42                      # RANDOM_SEED
+seeds: [42, 43, 44]           # used by run_matrix

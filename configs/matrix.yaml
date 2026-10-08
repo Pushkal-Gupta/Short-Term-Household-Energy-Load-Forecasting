@@ -1,0 +1,48 @@
+# Experiment matrix used by `python -m src.experiments.run_matrix`.
+# Every entry inherits the run config (configs/default.yaml unless --config is given) and applies
+# its `set:` overrides. The architecture and preprocessing never change between entries.
+#
+# Phase "tune": hyper-parameter selection on VALIDATION MAE only (first seed), under strong
+# non-IID data, which is where the proximal term matters. The winning mu (FedProx) and mu_0
+# (HA-FedProx) are written to <results>/metrics/tuning.json and substituted for "@mu_fedprox"
+# and "@mu_hafedprox" in the main phase. Test data is never looked at during tuning.
+
+tune:
+  - {name: T_fedprox_mu0.001,  method: federated, set: {fed.algorithm: fedprox,   fed.mu: 0.001, partition.strategy: cluster}}
+  - {name: T_fedprox_mu0.01,   method: federated, set: {fed.algorithm: fedprox,   fed.mu: 0.01,  partition.strategy: cluster}}
+  - {name: T_fedprox_mu0.1,    method: federated, set: {fed.algorithm: fedprox,   fed.mu: 0.1,   partition.strategy: cluster}}
+  - {name: T_hafedprox_mu0.01, method: federated, set: {fed.algorithm: hafedprox, fed.mu: 0.01,  partition.strategy: cluster}}
+  - {name: T_hafedprox_mu0.1,  method: federated, set: {fed.algorithm: hafedprox, fed.mu: 0.1,   partition.strategy: cluster}}
+  - {name: T_hafedprox_mu1.0,  method: federated, set: {fed.algorithm: hafedprox, fed.mu: 1.0,   partition.strategy: cluster}}
+
+main:
+  # ---- required matrix E0-E9 ----
+  - {name: E0_naive,             method: naive}
+  - {name: E1_local,             method: local}
+  - {name: E2_centralized,       method: centralized}
+  - {name: E3_fedavg_iid,        method: federated, set: {fed.algorithm: fedavg,  partition.strategy: iid}}
+  - {name: E4_fedavg_moderate,   method: federated, set: {fed.algorithm: fedavg,  partition.strategy: dirichlet, partition.alpha: 0.3}}
+  - {name: E5_fedprox_moderate,  method: federated, set: {fed.algorithm: fedprox, fed.mu: "@mu_fedprox", partition.strategy: dirichlet, partition.alpha: 0.3}}
+  - {name: E6_fedavg_strong,     method: federated, set: {fed.algorithm: fedavg,  partition.strategy: cluster}}
+  - {name: E7_fedprox_strong,    method: federated, set: {fed.algorithm: fedprox, fed.mu: "@mu_fedprox", partition.strategy: cluster}}
+  - {name: E8_fedavg_partial,    method: federated, set: {fed.algorithm: fedavg,  partition.strategy: dirichlet, partition.alpha: 0.3, fed.client_fraction: 0.5, fed.straggler_prob: 0.2}}
+  - {name: E9_fedprox_partial,   method: federated, set: {fed.algorithm: fedprox, fed.mu: "@mu_fedprox", partition.strategy: dirichlet, partition.alpha: 0.3, fed.client_fraction: 0.5, fed.straggler_prob: 0.2}}
+  # ---- E10: heterogeneity sweep (adds alpha = 1.0 and 0.1, plus HA-FedProx at every level) ----
+  - {name: E10_fedavg_a1.0,      method: federated, set: {fed.algorithm: fedavg,  partition.strategy: dirichlet, partition.alpha: 1.0}}
+  - {name: E10_fedprox_a1.0,     method: federated, set: {fed.algorithm: fedprox, fed.mu: "@mu_fedprox", partition.strategy: dirichlet, partition.alpha: 1.0}}
+  - {name: E10_fedavg_a0.1,      method: federated, set: {fed.algorithm: fedavg,  partition.strategy: dirichlet, partition.alpha: 0.1}}
+  - {name: E10_fedprox_a0.1,     method: federated, set: {fed.algorithm: fedprox, fed.mu: "@mu_fedprox", partition.strategy: dirichlet, partition.alpha: 0.1}}
+  - {name: E10_fedprox_iid,      method: federated, set: {fed.algorithm: fedprox, fed.mu: "@mu_fedprox", partition.strategy: iid}}
+  - {name: E10_hafedprox_iid,    method: federated, set: {fed.algorithm: hafedprox, fed.mu: "@mu_hafedprox", partition.strategy: iid}}
+  - {name: E10_hafedprox_a1.0,   method: federated, set: {fed.algorithm: hafedprox, fed.mu: "@mu_hafedprox", partition.strategy: dirichlet, partition.alpha: 1.0}}
+  - {name: E10_hafedprox_a0.3,   method: federated, set: {fed.algorithm: hafedprox, fed.mu: "@mu_hafedprox", partition.strategy: dirichlet, partition.alpha: 0.3}}
+  - {name: E10_hafedprox_a0.1,   method: federated, set: {fed.algorithm: hafedprox, fed.mu: "@mu_hafedprox", partition.strategy: dirichlet, partition.alpha: 0.1}}
+  - {name: E10_hafedprox_strong, method: federated, set: {fed.algorithm: hafedprox, fed.mu: "@mu_hafedprox", partition.strategy: cluster}}
+  # ---- E11: HA-FedProx with partial participation + stragglers ----
+  - {name: E11_hafedprox_partial, method: federated, set: {fed.algorithm: hafedprox, fed.mu: "@mu_hafedprox", partition.strategy: dirichlet, partition.alpha: 0.3, fed.client_fraction: 0.5, fed.straggler_prob: 0.2}}
+  # ---- E12: half-precision updates (communication ablation) ----
+  - {name: E12_fedavg_fp16_moderate, method: federated, set: {fed.algorithm: fedavg, fed.update_precision: float16, partition.strategy: dirichlet, partition.alpha: 0.3}}
+  # ---- E13: one household = one client (natural, un-dialled heterogeneity) ----
+  - {name: E13_fedavg_household,    method: federated, set: {fed.algorithm: fedavg,    partition.mode: household}}
+  - {name: E13_fedprox_household,   method: federated, set: {fed.algorithm: fedprox,   fed.mu: "@mu_fedprox",   partition.mode: household}}
+  - {name: E13_hafedprox_household, method: federated, set: {fed.algorithm: hafedprox, fed.mu: "@mu_hafedprox", partition.mode: household}}

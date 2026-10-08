@@ -1,0 +1,17 @@
+{
+  "mu_fedprox": 0.001,
+  "mu_hafedprox": 0.01,
+  "_selection": {
+    "mu_fedprox": {
+      "value": 0.001,
+      "val_mae": 0.07258593022721796,
+      "run": "T_fedprox_mu0.001"
+    },
+    "mu_hafedprox": {
+      "value": 0.01,
+      "val_mae": 0.07331729458042105,
+      "run": "T_hafedprox_mu0.01"
+    }
+  },
+  "_criterion": "lowest best-round validation MAE, first seed, strong non-IID (cluster) partition"
+}

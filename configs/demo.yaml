@@ -1,0 +1,31 @@
+# Demo / smoke-test configuration — SYNTHETIC data only.
+# Used by `python -m src.experiments.run_demo`. Output goes to results/demo/ and every
+# file and plot is tagged SYNTHETIC. These numbers are NOT project results.
+
+base: default.yaml
+experiment_tag: demo-synthetic
+results_dir: results/demo
+
+data:
+  source: synthetic
+  raw_dir: data/synthetic_demo/raw
+  processed_dir: data/synthetic_demo/processed
+  num_households: 12
+  start: "2013-01-01"
+  end: "2013-03-01"
+  train_end: "2013-02-01"
+  val_end: "2013-02-15"
+
+train:
+  max_epochs: 3
+  patience: 2
+  device: cpu
+
+partition:
+  households_per_client: 3
+  num_profile_clusters: 3
+
+fed:
+  rounds: 3
+
+seeds: [42]

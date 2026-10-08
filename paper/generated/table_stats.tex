@@ -1,0 +1,11 @@
+\begin{tabular}{llrrrr}
+\toprule
+A & B & median $\Delta$MAE (A$-$B) & A better (\%) & $p$ & $p_{\mathrm{Holm}}$ \\
+\midrule
+FedAvg, $\alpha$=0.3 & Local-only LSTM & +0.0013 & 34 & 0.0002 & 0.0002 \\
+FedAvg, $\alpha$=0.3 & Centralised LSTM (pooled raw data) & +0.0026 & 0 & $<10^{-4}$ & $<10^{-4}$ \\
+FedAvg, random (IID-ish) & Centralised LSTM (pooled raw data) & +0.0021 & 0 & $<10^{-4}$ & $<10^{-4}$ \\
+FedProx, $\alpha$=0.3 & FedAvg, $\alpha$=0.3 & -0.0002 & 70 & $<10^{-4}$ & $<10^{-4}$ \\
+Centralised LSTM (pooled raw data) & Local-only LSTM & -0.0016 & 72 & $<10^{-4}$ & $<10^{-4}$ \\
+\bottomrule
+\end{tabular}

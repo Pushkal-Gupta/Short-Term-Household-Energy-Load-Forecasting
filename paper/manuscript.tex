@@ -1,0 +1,35 @@
+% Manuscript draft. Compile:  cd paper && tectonic manuscript.tex   (or pdflatex+bibtex)
+% Every number in the Results section is taken from generated/numbers.tex and generated/table_*.tex,
+% which are written by `python -m src.experiments.make_report` from the real-data runs.
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xurl}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{caption}
+\captionsetup{font=small}
+\graphicspath{{figures/}}
+\input{generated/numbers.tex}
+
+\title{Measuring What Heterogeneity Costs: A Controlled, Communication-Priced Study of Federated LSTM Forecasting on London Smart Meters, with a Heterogeneity-Adaptive Proximal Rule}
+\author{Pushkal Gupta \and Kaushik Vanka\\[2pt]\small School of Computer Science and Engineering, Vellore Institute of Technology}
+\date{Draft --- \today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+%ABSTRACT%
+\end{abstract}
+
+\noindent\textbf{Keywords:} federated learning; short-term load forecasting; smart meters; LSTM; non-IID data; FedProx; communication cost; energy equity.
+
+%BODY%
+
+\bibliographystyle{unsrtnat}
+\bibliography{refs}
+\end{document}

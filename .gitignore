@@ -9,3 +9,28 @@ preview/
 
 # macOS
 .DS_Store
+
+# Datasets (Low Carbon London is ~8.5 GB uncompressed; never commit it)
+data/raw/*
+!data/raw/README.md
+data/processed/*
+!data/processed/README.md
+data/clients/*
+!data/clients/README.md
+data/synthetic_demo/
+
+# Large / regenerable experiment artefacts
+results/predictions/
+results/models/
+results/demo/
+results/probe/
+results/sample/
+*.zip
+
+# LaTeX build products
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.bbl
+paper/*.blg
+.pytest_cache/

@@ -1,2 +1,15 @@
+# Slide deck pipeline (src/build.py, src/kit.py)
 python-pptx==1.0.2
 python-docx==1.1.2
+
+# ML pipeline (tested with Python 3.14.7 on macOS arm64; any Python >= 3.10 with these wheels works)
+torch==2.14.1
+numpy==2.5.3
+pandas==3.0.6
+pyarrow==25.0.1
+PyYAML==6.0.3
+scipy==1.18.1
+scikit-learn==1.9.1
+matplotlib==3.11.2
+tqdm==4.70.1
+pytest==9.1.1
