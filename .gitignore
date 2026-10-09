@@ -4,9 +4,6 @@ __pycache__/
 .venv/
 venv/
 
-# Generated slide previews (regenerate with `make preview`)
-preview/
-
 # macOS
 .DS_Store
 

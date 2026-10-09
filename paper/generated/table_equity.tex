@@ -2,9 +2,12 @@
 \toprule
 Arm & Harmed vs local (\%) & Median benefit (kWh) & P90 MAE & Harmed after FT (\%) \\
 \midrule
-Centralised LSTM (pooled raw data) & 28 & +0.0016 & 0.1364 & -- \\
-FedAvg, random (IID-ish) & 56 & -0.0005 & 0.1439 & 46 \\
+Centralised & 28 & +0.0016 & 0.1364 & -- \\
+FedAvg, random & 56 & -0.0005 & 0.1439 & 46 \\
 FedAvg, $\alpha$=0.3 & 66 & -0.0013 & 0.1445 & 48 \\
-FedAvg, cluster (strong) & 61 & -0.0008 & 0.1428 & 46 \\
+FedAvg, cluster & 61 & -0.0008 & 0.1428 & 46 \\
+HA-FedProx, $\alpha$=0.3 & 66 & -0.0013 & 0.1454 & 55 \\
+FedAvg, K=100 & 82 & -0.0027 & 0.1514 & 61 \\
+HA-FedProx, K=100 & 85 & -0.0028 & 0.1515 & 67 \\
 \bottomrule
 \end{tabular}

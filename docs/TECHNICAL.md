@@ -98,13 +98,15 @@ FedProx (`client.py` + `centralized/train.py::train_epochs`): the local objectiv
 partial updates are **kept**. With μ = 0 and stragglers dropped, the code path is bit-identical
 to FedAvg, which a unit test checks.
 
-**HA-FedProx (contribution of this project, `fedprox.py::MuSchedule`).** After aggregating round t,
+**HA-FedProx (`fedprox.py::MuSchedule`).** After aggregating round t,
 the server computes the update-disagreement ratio
 
 ρ_t = Σ_k p_k‖Δ_k − Δ̄‖² / Σ_k p_k‖Δ_k‖²,  Δ_k = w_k − w_t,  Δ̄ = Σ p_k Δ_k,  p_k = n_k/Σn,
 
-which lies in [0, 1] (`fedavg.py::update_dissimilarity`) and equals 1 − 1/B_t², where B_t² is
-the empirical local-dissimilarity of Li et al. (2020). The next round uses
+which lies in [0, 1] (`fedavg.py::update_dissimilarity`) and equals 1 − 1/B_t², where B_t² is an
+update-space estimate of the B-local dissimilarity of Li et al. (2020). It belongs to the same ratio family as
+gradient diversity (Yin et al., 2018). Prior adaptive-μ rules use the training loss (Li et al., 2020) or a
+local-vs-global performance index (HAPI-FedProx, 2025); see `paper/LITERATURE_NOTES.md`. The next round uses
 μ_{t+1} = clip(μ_0 · ρ_t, μ_min, μ_max). The server computes ρ_t from updates it already holds,
 so the clients send nothing extra. μ_0 is tuned on validation exactly like FedProx's fixed μ.
 
@@ -173,6 +175,7 @@ which validation MAE first comes within ε = 10 % of the centralised validation 
 | E11 | HA-FedProx | as E8 | partial participation |
 | E12 | FedAvg | α=0.3, float16 updates | half the bytes |
 | E13 | FedAvg, FedProx, HA-FedProx | 1 household = 1 client | natural heterogeneity |
+| E14 | FedAvg | random, K ∈ {1, 5, 50} | fragmentation sweep (K = 20 is E3, K = 100 is E13) |
 
 Budget: federated runs use 30 rounds × 1 local epoch, the same number of passes over the data
 as the centralised arm's 30-epoch cap. Each runs on 3 seeds (42, 43, 44); the seed changes model
@@ -193,23 +196,28 @@ over seeds) for the comparisons listed in `stats_tests.csv`, with Holm correctio
   signature is checked before reuse.
 - Real results were produced on macOS 26 (Apple M5 Max, MPS), Python 3.14.7, torch 2.14.1.
 
-## 12. Run status and observations so far
+## 12. Analyses produced by `make_report`
 
-The real-data matrix runs as `python -m src.experiments.run_matrix --workers 8`, and its log is
-`results/logs/matrix_real.log`. Each federated community run takes about 45–50 min with 8 runs in
-parallel on the M5 Max (MPS). The matrix can be resumed: re-running the command skips any run whose
-summary JSON already exists.
+| Output | What it answers | Code |
+|---|---|---|
+| `gap_decomposition.csv` / `table_decomposition.tex` | how much of the federated–centralised gap is due to the round protocol (K = 1), fragmentation (K = 20), label-skewed grouping, and partial participation | `report.py` |
+| `fragmentation.csv` / `fragmentation.png` | error as the same homes are split over K = 1…100 clients, with and without local fine-tuning | `report.py`, `plots.fragmentation` |
+| `heterogeneity.csv` / `heterogeneity_response.png` | final error and B@ε against measured load-shape divergence H_JS | `plots.heterogeneity_response` |
+| `rho_vs_heterogeneity.csv` / `rho_vs_round.png` | whether the update-disagreement ratio ρ measures heterogeneity: Spearman correlation with H_JS over comparable runs, and within-run vs between-partition range | `report.py`, `plots.rho_vs_round` |
+| `stats_tests.csv` | paired Wilcoxon + Holm per household, including the fine-tuned (`:ft`) variants | `report.py` |
+| `equity.csv`, `equity_by_stratum.csv` | share of homes harmed vs local training, by consumption quintile | `report.py` |
+| `graphical_abstract.png` | journal graphical abstract, drawn from the decomposition and B@ε | `plots.graphical_abstract` |
+| `paper/generated/numbers.tex` | every number quoted in the manuscript, as `\newcommand` macros (`report.py::_mkey` names them) | `report.py::_latex` |
 
-Observations from completed runs only. The README results section holds the live table.
-- **Tuning** (`tuning.json`) picked the smallest grid value for both proximal methods (μ = 0.001; μ₀ = 0.01).
-  Larger μ consistently hurt validation MAE.
-- **The update-disagreement ratio ρ_t was high and nearly flat (≈ 0.80–0.87)** in every tuning run. So
-  μ_t = μ₀·ρ_t is close to a constant, and HA-FedProx behaves like fixed-μ FedProx. The probable cause: with
-  1 local epoch on 5 noisy homes, client updates are dominated by stochastic-gradient noise, and ρ cannot
-  separate that noise from distribution shift. Whether mean ρ rises with H across the α sweep is reported in
-  `heterogeneity.csv` (column `mean_rho`) when E10 completes. That column is the direct test of the
-  rule's premise.
-- **Communication is not a saving at this scale.** The federated arms upload and download 82.6 MB over
-  30 rounds, about 6× the 14.0 MB of raw training readings the centralised arm would ship. The bytes-to-ε
-  metrics (`R_eps`, `B_eps_MB` in `summary_by_experiment.csv`) quantify how much of that budget is needed. So far: about 12.9 MB with random
-  grouping vs about 21 MB at α = 0.3.
+### Note on ρ
+
+ρ_t ranks heterogeneity: across full-participation runs with K = 20, its mean and its round-1 value correlate
+positively with H_JS. Its rise within a run, from about 0.15 in round 1 to about 0.95 at convergence, is however
+far larger than its spread across groupings. μ_t = μ0·ρ_t therefore behaves mainly as a schedule that increases the
+proximal pull as training converges. The exact numbers are the `Rho*` macros in `paper/generated/numbers.tex`.
+
+### Running time
+
+On one Apple M5 Max (MPS), with 8 runs in parallel, a 30-round community-mode federated run takes about 40–50 min.
+The full tuning + main matrix takes about 8 h. `run_matrix` is resumable: finished runs (summary JSON present) are
+skipped.

@@ -62,7 +62,7 @@ ML conference papers (ICLR, ICML, NeurIPS, MLSys, AISTATS) do not have DOIs, so 
 | ukpn2015lcl | Verified (dataset page exists; title, author, licence and content match) | URL | Note added. **Caveat:** the Datastore page shows no publication date, so the year 2015 could not be confirmed |
 | kong2019stlf | Verified | 10.1109/TSG.2017.2753802 | DOI added |
 
-The original header said the deck references were "NOT verified against Scopus/WoS". All 27 deck references are confirmed to exist with matching titles and venues (via Crossref). Indexing status (Scopus/WoS) was not checked.
+All 27 references of the original bibliography are confirmed to exist with matching titles and venues (via Crossref). Indexing status (Scopus/WoS) was not checked.
 
 ---
 
@@ -194,4 +194,4 @@ The "FL can be worse than local" finding is therefore **already published** (not
 - **widmer2023: the "59.1%" result.** Taken from a search-result summary, not the full text.
 - **ICLR papers (acar2021feddyn, reddi2021fedopt, li2020qffl).** The venue is confirmed via the arXiv comment fields and the iclr.cc / mlanthology listings. The OpenReview pages could not be fetched (bot check), so the entries use arXiv URLs.
 - **CIRED 2015 LCL paper.** Its DOI could not be found, so it was not added.
-- **Indexing (Scopus/WoS) of the deck references.** Not checked.
+- **Indexing (Scopus/WoS) of the original 27 references.** Not checked.

@@ -1,0 +1,7 @@
+Highlights
+
+• Same 100 London homes, model and budget; one federated-learning factor varied
+• FedAvg on one client matches centralised; the gap grows with the client count
+• Client heterogeneity barely moves accuracy but adds ~85% traffic to near-optimum
+• Federated training moved more bytes than uploading the raw half-hourly readings
+• Adaptive FedProx fails: update dissimilarity is dominated by convergence

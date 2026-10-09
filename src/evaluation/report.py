@@ -191,7 +191,8 @@ def build_report(cfg: dict, write_paper: bool | None = None) -> dict:
                              "H_JS_mean": r["H_JS_mean"], "H_CV_mean": r["H_CV_mean"],
                              "test_mae_mean": r["test_mae_mean"], "test_mae_std": r["test_mae_std"],
                              "test_rmse_mean": r["test_rmse_mean"], "gap_to_central_pct": 100 * (r["test_mae_mean"] / cmae - 1),
-                             "mean_rho": rho})
+                             "mean_rho": rho, "R_eps_mean": r.get("R_eps_mean", np.nan),
+                             "B_eps_MB_mean": r.get("B_eps_MB_mean", np.nan)})
     H = pd.DataFrame(het_rows)
     H.to_csv(mdir / "heterogeneity.csv", index=False)
 
@@ -205,7 +206,7 @@ def build_report(cfg: dict, write_paper: bool | None = None) -> dict:
             continue
         r = r.iloc[0]
         fr.append({"K": K, "experiment": name, "test_mae_mean": r["test_mae_mean"], "test_mae_std": r["test_mae_std"],
-                   "ft_mae_mean": r.get("ft_mae_mean", np.nan), "H_mean": r["H_mean"],
+                   "ft_mae_mean": r.get("ft_mae_mean", np.nan), "H_mean": r["H_mean"], "H_JS_mean": r["H_JS_mean"],
                    "mean_rho": _mean_rho(rundir, name), "best_round_mean": r["best_round_mean"],
                    "gap_to_central_pct": 100 * (r["test_mae_mean"] / cmae - 1)})
     FR = pd.DataFrame(fr)
@@ -241,10 +242,31 @@ def build_report(cfg: dict, write_paper: bool | None = None) -> dict:
         h = pd.read_csv(f)
         late = h[h["round"] > 1]["update_disagreement_rho"]
         rr.append({"experiment": r["experiment"], "seed": r["seed"], "H": r.get("H", np.nan),
+                   "H_JS": r.get("H_JS", np.nan), "client_fraction": r.get("client_fraction", np.nan),
                    "num_clients": r.get("num_clients", np.nan), "rho_round1": float(h["update_disagreement_rho"].iloc[0]),
                    "rho_mean": float(late.mean()), "rho_last": float(h["update_disagreement_rho"].iloc[-1])})
     RH = pd.DataFrame(rr)
     RH.to_csv(mdir / "rho_vs_heterogeneity.csv", index=False)
+
+    # ---- fragmentation vs heterogeneity: OLS of per-run FedAvg test MAE on log K and H_JS ----
+    REG = {}
+    fa = main[(main["method"] == "federated") & (main["algorithm"] == "fedavg") & (main["client_fraction"] == 1.0)
+              & (main["update_precision"] == "float32") & (main["num_clients"] > 1)]
+    if len(fa) >= 8 and fa["num_clients"].nunique() >= 3:
+        from scipy import stats as _st
+        X = np.column_stack([np.ones(len(fa)), np.log(fa["num_clients"]), fa["H_JS"]])
+        y = fa["test_mae"].to_numpy()
+        b = np.linalg.lstsq(X, y, rcond=None)[0]
+        resid = y - X @ b
+        dof = len(y) - X.shape[1]
+        se = np.sqrt(np.diag(resid @ resid / dof * np.linalg.inv(X.T @ X)))
+        pv = 2 * _st.t.sf(np.abs(b / se), dof)
+        k20 = fa[fa["num_clients"] == 20]
+        rs20 = _st.spearmanr(k20["H_JS"], k20["test_mae"])
+        REG = {"b_logK": b[1], "p_logK": pv[1], "b_HJS": b[2], "p_HJS": pv[2],
+               "r2": 1 - (resid @ resid) / ((y - y.mean()) @ (y - y.mean())), "n": len(y),
+               "rho_k20": rs20.statistic, "p_k20": rs20.pvalue, "n_k20": len(k20)}
+        pd.DataFrame([REG]).to_csv(mdir / "fragmentation_regression.csv", index=False)
 
     # ---- paired statistics over households ----
     hh = {n: _households(rundir, n) for n in S["experiment"]}
@@ -323,10 +345,30 @@ def build_report(cfg: dict, write_paper: bool | None = None) -> dict:
         if len(lm := S.loc[S["experiment"] == "E1_local", "test_mae_mean"]):
             refs["Local-only"] = ("local", float(lm.iloc[0]))
         plots.fragmentation(FR, pdir / "fragmentation.png", refs, tag)
+    if len(DEC) >= 3 and "synthetic" not in tag.lower():
+        def _b(n):
+            r = S.loc[S["experiment"] == n, "B_eps_MB_mean"] if "B_eps_MB_mean" in S else []
+            return float(r.iloc[0]) if len(r) and pd.notna(r.iloc[0]) else None
+        beps = {"Raw data upload\n(centralised)": float(S.loc[S["experiment"] == "E2_centralized",
+                                                             "total_bytes_mean"].iloc[0]) / 1e6}
+        for n, lab in [("E3_fedavg_iid", "FedAvg\nrandom"), ("E4_fedavg_moderate", "FedAvg\nα=0.3"),
+                       ("E6_fedavg_strong", "FedAvg\nclustered")]:
+            if (b := _b(n)) is not None:
+                beps[lab] = b
+        lg = S.loc[S["experiment"] == "E1_local", "test_mae_mean"]
+        gap = {n: float(100 * (S.loc[S["experiment"] == n, "test_mae_mean"].iloc[0] / cmae - 1))
+               for n in S["experiment"]}
+        ga_rows = [(lab, gap[n], kind) for n, lab, kind in [
+            ("E14_fedavg_K1", "K = 1 (all homes in one client)", "K"), ("E14_fedavg_K5", "K = 5, random", "K"),
+            ("E3_fedavg_iid", "K = 20, random", "K"), ("E4_fedavg_moderate", "K = 20, Dirichlet α = 0.3", "H"),
+            ("E6_fedavg_strong", "K = 20, clustered by profile", "H"), ("E14_fedavg_K50", "K = 50, random", "K"),
+            ("E13_fedavg_household", "K = 100, one home per client", "K")] if n in gap]
+        plots.graphical_abstract(ga_rows, beps, float(100 * (lg.iloc[0] / cmae - 1)) if len(lg) else np.nan,
+                                 pdir / "graphical_abstract.png")
     if write_paper is None:
         write_paper = "synthetic" not in tag.lower() and "sample" not in tag.lower()
     if write_paper:
-        _latex(S, C, H, ST, EQ, STR, cfg, central_val, FR, DEC, RH)
+        _latex(S, C, H, ST, EQ, STR, cfg, central_val, FR, DEC, RH, REG)
     return {"comparison": C, "summary": S}
 
 
@@ -424,11 +466,12 @@ def _make_plots(cfg, S, H, STR, hh, rundir, pdir, tag, central_val):
     loc_hh = hh.get("E1_local")
     if loc_hh is not None:
         ben = {}
-        for n, alg, lab in [("E2_centralized", "centralized", "Centralised"), ("E4_fedavg_moderate", "fedavg", "FedAvg, α=0.3"),
-                            ("E10_hafedprox_a0.3", "hafedprox", "HA-FedProx, α=0.3"),
-                            ("E13_fedavg_household", "fedavg", "FedAvg, household clients")]:
-            if hh.get(n) is not None:
-                ben[lab] = (alg, (loc_hh["mae"] - hh[n]["mae"].reindex(loc_hh.index)).to_numpy())
+        for n, alg, lab, col in [("E2_centralized", "centralized", "Centralised", "mae"),
+                                 ("E4_fedavg_moderate", "fedavg", "FedAvg, α=0.3", "mae"),
+                                 ("E4_fedavg_moderate", "finetuned", "FedAvg, α=0.3 + local FT", "ft_mae"),
+                                 ("E13_fedavg_household", "fedavg", "FedAvg, household clients", "mae")]:
+            if hh.get(n) is not None and col in hh[n]:
+                ben[lab] = (alg, (loc_hh["mae"] - hh[n][col].reindex(loc_hh.index)).to_numpy())
         if ben:
             plots.benefit_distribution(ben, pdir / "federation_benefit_cdf.png", tag)
     _prediction_plot(cfg, S, pdir, tag)
@@ -457,13 +500,13 @@ def _prediction_plot(cfg, S, pdir, tag):
 
 # ───────────────────────────── LaTeX for the manuscript ─────────────────────────────
 
-def _latex(S, C, H, ST, EQ, STR, cfg, central_val, FR=None, DEC=None, RH=None):
+def _latex(S, C, H, ST, EQ, STR, cfg, central_val, FR=None, DEC=None, RH=None, REG=None):
     out = resolve("paper/generated")
     out.mkdir(parents=True, exist_ok=True)
     lines = [r"\begin{tabular}{lrrrrrr}", r"\toprule",
              r"Method & MAE & RMSE & MAPE$^\ast$ & WAPE & Best rd. & Traffic (MB) \\", r"\midrule"]
     for r in C.itertuples():
-        lines.append(f"{_tex(r.Method)} & {_pm(r.MAE, r.MAE_std)} & {_pm(r.RMSE, r.RMSE_std)} & "
+        lines.append(f"{_tex(_short(r.Method))} & {_pm(r.MAE, r.MAE_std)} & {_pm(r.RMSE, r.RMSE_std)} & "
                      f"{_pm(r.MAPE, r.MAPE_std, 1)} & {r.WAPE:.1f} & {_tex(str(r.Rounds))} & {r.Communication_MB:.1f} \\\\")
     lines += [r"\bottomrule", r"\end{tabular}"]
     (out / "table_main.tex").write_text("\n".join(lines) + "\n")
@@ -481,7 +524,7 @@ def _latex(S, C, H, ST, EQ, STR, cfg, central_val, FR=None, DEC=None, RH=None):
         L = [r"\begin{tabular}{llrrrr}", r"\toprule",
              r"A & B & median $\Delta$MAE (A$-$B) & A better (\%) & $p$ & $p_{\mathrm{Holm}}$ \\", r"\midrule"]
         for r in ST.itertuples():
-            L.append(f"{_tex(describe(r.A))} & {_tex(describe(r.B))} & {r.median_diff_mae_A_minus_B:+.4f} & "
+            L.append(f"{_tex(_short(describe(r.A)))} & {_tex(_short(describe(r.B)))} & {r.median_diff_mae_A_minus_B:+.4f} & "
                      f"{100 * r.share_households_A_better:.0f} & {_p(r.p_value)} & {_p(r.p_holm)} \\\\")
         L += [r"\bottomrule", r"\end{tabular}"]
         (out / "table_stats.tex").write_text("\n".join(L) + "\n")
@@ -491,7 +534,7 @@ def _latex(S, C, H, ST, EQ, STR, cfg, central_val, FR=None, DEC=None, RH=None):
              r"Arm & Harmed vs local (\%) & Median benefit (kWh) & P90 MAE & Harmed after FT (\%) \\", r"\midrule"]
         for r in EQ.itertuples():
             ft = f"{100 * r.ft_share_harmed:.0f}" if hasattr(r, "ft_share_harmed") and pd.notna(r.ft_share_harmed) else "--"
-            L.append(f"{_tex(describe(r.experiment))} & {100 * r.share_harmed:.0f} & {r.median_benefit_kwh:+.4f} & "
+            L.append(f"{_tex(_short(describe(r.experiment)))} & {100 * r.share_harmed:.0f} & {r.median_benefit_kwh:+.4f} & "
                      f"{r.worst_decile_mae:.4f} & {ft} \\\\")
         L += [r"\bottomrule", r"\end{tabular}"]
         (out / "table_equity.tex").write_text("\n".join(L) + "\n")
@@ -499,10 +542,7 @@ def _latex(S, C, H, ST, EQ, STR, cfg, central_val, FR=None, DEC=None, RH=None):
     # \newcommand macros so the manuscript text cites numbers straight from the results
     mac = {}
     for r in S.itertuples():
-        key = re.sub(r"[^A-Za-z]", "", r.experiment.replace("0.", "p").replace("1.0", "one")
-                     .replace("0", "zero").replace("1", "one").replace("2", "two").replace("3", "three")
-                     .replace("4", "four").replace("5", "five").replace("6", "six").replace("7", "seven")
-                     .replace("8", "eight").replace("9", "nine"))
+        key = _mkey(r.experiment)
         mac[f"{key}MAE"] = f"{r.test_mae_mean:.4f}"
         mac[f"{key}RMSE"] = f"{r.test_rmse_mean:.4f}"
         mac[f"{key}MAPE"] = f"{r.test_mape_mean:.1f}"
@@ -524,8 +564,14 @@ def _latex(S, C, H, ST, EQ, STR, cfg, central_val, FR=None, DEC=None, RH=None):
         cm = S.loc[S["experiment"] == "E2_centralized", "test_mae_mean"]
         if len(cm):
             mac[f"{key}Gap"] = f"{100 * (r.test_mae_mean / float(cm.iloc[0]) - 1):+.1f}"
+    if len(C):
+        for lab, key in [("Persistence (naive)", "Persistence"), ("Seasonal naive (t−48)", "SeasonalNaive")]:
+            row = C[C["Method"] == lab]
+            if len(row):
+                mac[f"{key}MAE"] = f"{row['MAE'].iloc[0]:.4f}"
+                mac[f"{key}RMSE"] = f"{row['RMSE'].iloc[0]:.4f}"
     any_run = S.iloc[0]
-    mac.update({"NumHouseholds": str(int(any_run["num_households"])), "NumParams": str(int(any_run["num_params"])),
+    mac.update({"NumHouseholds": str(int(any_run["num_households"])), "NumParams": f"{int(any_run['num_params']):,}".replace(",", "{,}"),
                 "PayloadKB": f"{4 * int(any_run['num_params']) / 1e3:.1f}"})
     rep = json.loads(resolve(cfg["data"]["processed_dir"]).joinpath("preprocess_report.json").read_text())
     mac.update({"HouseholdsSeen": f"{rep['households_seen']:,}".replace(",", "{,}"),
@@ -537,11 +583,11 @@ def _latex(S, C, H, ST, EQ, STR, cfg, central_val, FR=None, DEC=None, RH=None):
         mac.update({"TunedMuFedProx": f"{t.get('mu_fedprox', float('nan')):g}",
                     "TunedMuHA": f"{t.get('mu_hafedprox', float('nan')):g}"})
     if FR is not None and len(FR):
-        L = [r"\begin{tabular}{rrrrrr}", r"\toprule",
-             r"$K$ & homes/client & Test MAE & FT MAE & $\bar\rho$ & Gap to central (\%) \\", r"\midrule"]
+        L = [r"\begin{tabular}{rrrrrrr}", r"\toprule",
+             r"$K$ & homes/client & $H_{JS}$ & Test MAE & FT MAE & $\bar\rho$ & Gap to central (\%) \\", r"\midrule"]
         for r in FR.itertuples():
             ft = f"{r.ft_mae_mean:.4f}" if pd.notna(r.ft_mae_mean) else "--"
-            L.append(f"{r.K} & {100 // r.K} & {_pm(r.test_mae_mean, r.test_mae_std)} & {ft} & "
+            L.append(f"{r.K} & {100 // r.K} & {r.H_JS_mean:.4f} & {_pm(r.test_mae_mean, r.test_mae_std)} & {ft} & "
                      f"{r.mean_rho:.3f} & {r.gap_to_central_pct:+.1f} \\\\")
         L += [r"\bottomrule", r"\end{tabular}"]
         (out / "table_fragmentation.tex").write_text("\n".join(L) + "\n")
@@ -556,23 +602,36 @@ def _latex(S, C, H, ST, EQ, STR, cfg, central_val, FR=None, DEC=None, RH=None):
         (out / "table_decomposition.tex").write_text("\n".join(L) + "\n")
     if RH is not None and len(RH) >= 4:
         from scipy.stats import spearmanr
-        sub = RH[RH["num_clients"] > 1].dropna(subset=["H"])
+        # same K and full participation, so only the grouping differs between runs
+        sub = RH[(RH["num_clients"] == 20) & (RH["client_fraction"] == 1.0)].dropna(subset=["H_JS"])
         if len(sub) >= 4:
-            rs, rp = spearmanr(sub["H"], sub["rho_mean"])
-            r1s, r1p = spearmanr(sub["H"], sub["rho_round1"])
+            rs, rp = spearmanr(sub["H_JS"], sub["rho_mean"])
+            r1s, r1p = spearmanr(sub["H_JS"], sub["rho_round1"])
             mac.update({"RhoHSpearman": f"{rs:+.2f}", "RhoHSpearmanP": _p(rp), "RhoHRuns": str(len(sub)),
                         "RhoOneHSpearman": f"{r1s:+.2f}", "RhoOneHSpearmanP": _p(r1p)})
-        mac.update({"RhoRoundOne": f"{RH['rho_round1'].mean():.2f}", "RhoLast": f"{RH['rho_last'].mean():.2f}",
-                    "RhoMin": f"{RH['rho_mean'].min():.2f}", "RhoMax": f"{RH['rho_mean'].max():.2f}"})
+            per_part = sub.groupby("experiment")["rho_mean"].mean()
+            between = float(per_part.max() - per_part.min())
+            within = float((sub["rho_last"] - sub["rho_round1"]).mean())
+            mac.update({"RhoBetween": f"{between:.3f}", "RhoWithin": f"{within:.2f}",
+                        "RhoWithinOverBetween": f"{within / between:.0f}" if between > 0 else "--"})
+        comp = RH[(RH["num_clients"] == 20) & (RH["client_fraction"] == 1.0)]
+        if len(comp):
+            mac.update({"RhoRoundOne": f"{comp['rho_round1'].mean():.2f}", "RhoLast": f"{comp['rho_last'].mean():.2f}",
+                        "RhoMin": f"{comp['rho_mean'].min():.2f}", "RhoMax": f"{comp['rho_mean'].max():.2f}"})
+    if REG:
+        mac.update({"RegLogK": f"{1e3 * REG['b_logK']:.2f}", "RegLogKP": _p(REG["p_logK"]),
+                    "RegHJS": f"{REG['b_HJS']:.3f}", "RegHJSP": _p(REG["p_HJS"]), "RegRtwo": f"{REG['r2']:.2f}",
+                    "RegN": str(REG["n"]), "KtwentySpearman": f"{REG['rho_k20']:+.2f}",
+                    "KtwentySpearmanP": _p(REG["p_k20"]), "KtwentyN": str(REG["n_k20"])})
     if len(ST):
         for r in ST.itertuples():
-            k = re.sub(r"[^A-Za-z]", "", (r.A + "vs" + r.B).translate(str.maketrans("0123456789.", "abcdefghijp")))
+            k = f"{_mkey(r.A)}vs{_mkey(r.B)}"
             mac[f"St{k}Better"] = f"{100 * r.share_households_A_better:.0f}"
             mac[f"St{k}P"] = _p(r.p_holm)
             mac[f"St{k}Med"] = f"{r.median_diff_mae_A_minus_B:+.4f}"
     if len(EQ):
         for r in EQ.itertuples():
-            k = re.sub(r"[^A-Za-z]", "", r.experiment.translate(str.maketrans("0123456789.", "abcdefghijp")))
+            k = _mkey(r.experiment)
             mac[f"Eq{k}Harmed"] = f"{100 * r.share_harmed:.0f}"
             if hasattr(r, "ft_share_harmed") and pd.notna(r.ft_share_harmed):
                 mac[f"Eq{k}FTHarmed"] = f"{100 * r.ft_share_harmed:.0f}"
@@ -581,6 +640,28 @@ def _latex(S, C, H, ST, EQ, STR, cfg, central_val, FR=None, DEC=None, RH=None):
     figdir.mkdir(parents=True, exist_ok=True)
     for png in results_path(cfg, "plots", "x").parent.glob("*.png"):
         shutil.copy(png, figdir / png.name)
+
+
+def _short(label: str) -> str:
+    """Compact arm names for wide LaTeX tables."""
+    for long, short in [("Centralised LSTM (pooled raw data)", "Centralised"), ("Local-only LSTM", "Local-only"),
+                        (", 50% participation + 20% stragglers", ", partial"), (", 1 household = 1 client", ", K=100"),
+                        (" (IID-ish)", ""), (" (strong)", ""), (" client(s), random", ", random"),
+                        (", float16 updates", ", fp16")]:
+        label = label.replace(long, short)
+    return label
+
+
+_DIGITS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"]
+
+
+def _mkey(name: str) -> str:
+    """Experiment name -> LaTeX-safe macro stem, e.g. E10_fedavg_a0.1 -> Eonezerofedavgazeropone;
+    a ':ft' suffix (fine-tuned variant) becomes 'FT'."""
+    name, _, ft = name.partition(":")
+    name = name.replace(".", "p")
+    out = "".join(_DIGITS[int(c)] if c.isdigit() else c for c in name)
+    return re.sub(r"[^A-Za-z]", "", out) + ("FT" if ft else "")
 
 
 def _tex(s: str) -> str:

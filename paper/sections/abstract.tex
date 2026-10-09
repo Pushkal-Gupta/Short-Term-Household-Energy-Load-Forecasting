@@ -1,3 +1,15 @@
 \begin{abstract}
-Placeholder.
+Federated learning is promoted for household load forecasting because it keeps smart-meter data at home. Yet its
+accuracy loss is usually blamed on data heterogeneity, and its bandwidth advantage is assumed rather than measured.
+We test both claims on 100 London households from the Low Carbon London trial with a controlled protocol: the same
+homes, test set, LSTM and compute budget, changing one factor at a time: number of clients, heterogeneity (dialled
+over real load-profile clusters and measured by a label-free index), participation, aggregation rule (FedAvg, FedProx,
+a heterogeneity-adaptive proximal rule) and update precision.
+Every byte exchanged is counted. Federated training on a single client matches centralised accuracy. The gap is
+caused by fragmentation, growing from 2\,\% with five clients to 10\,\% with one client per home. Heterogeneity at
+a fixed number of clients barely changes final error, but raises the traffic needed to approach centralised accuracy
+by about 85\,\%. Federated training moves more bytes than uploading the raw readings. FedAvg leaves most households
+worse off than local models; one epoch of local fine-tuning largely removes this at community scale. Proximal
+regularisation does not help, and its adaptive variant fails because update dissimilarity is dominated by convergence,
+not heterogeneity.
 \end{abstract}

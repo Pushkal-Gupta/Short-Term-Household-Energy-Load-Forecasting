@@ -3,9 +3,11 @@
 Setting & Test MAE & $\Delta$ vs previous & Gap to central (\%) \\
 \midrule
 Centralised (pooled raw data) & 0.0811 $\pm$ 0.0003 & -- & +0.0 \\
-+ split over 20 clients, random grouping & 0.0853 $\pm$ 0.0009 & +0.0042 & +5.2 \\
++ round protocol, 1 client (K=1) & 0.0808 $\pm$ 0.0005 & -0.0002 & -0.3 \\
++ split over 20 clients, random grouping & 0.0853 $\pm$ 0.0009 & +0.0044 & +5.2 \\
 + label-skewed grouping ($\alpha$=0.3) & 0.0861 $\pm$ 0.0004 & +0.0008 & +6.2 \\
 + 50\% participation, 20\% stragglers & 0.0849 $\pm$ 0.0004 & -0.0012 & +4.7 \\
 cluster grouping instead (strong non-IID) & 0.0857 $\pm$ 0.0003 & -- & +5.7 \\
+1 home = 1 client (K=100) & 0.0894 $\pm$ 0.0013 & -- & +10.3 \\
 \bottomrule
 \end{tabular}

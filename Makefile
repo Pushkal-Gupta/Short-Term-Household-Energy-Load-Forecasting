@@ -1,11 +1,10 @@
 PY ?= .venv/bin/python
-DECK = deck/23BCT0253.pptx
 WORKERS ?= 8
 
-.PHONY: help venv install flower deck preview check clean test demo data preprocess baselines fedavg fedprox matrix report paper
+.PHONY: help venv install flower clean test demo data preprocess baselines fedavg fedprox matrix report paper
 
 help:
-	@echo "make venv        - create .venv and install every dependency (deck + ML)"
+	@echo "make venv        - create .venv and install every dependency "
 	@echo "make flower      - also install Flower (optional --backend flower)"
 	@echo "make test        - unit tests"
 	@echo "make demo        - end-to-end check on SYNTHETIC data (results/demo/)"
@@ -17,9 +16,7 @@ help:
 	@echo "make matrix      - full experiment matrix, 3 seeds, WORKERS=$(WORKERS) in parallel"
 	@echo "make report      - tables, statistics, plots, paper/generated/*.tex"
 	@echo "make paper       - compile paper/manuscript.pdf (needs tectonic or pdflatex)"
-	@echo "make deck        - regenerate $(DECK) from src/"
-	@echo "make preview     - render every slide to preview/ as PNG (macOS only)"
-	@echo "make check       - report out-of-bounds shapes and likely text overflow"
+	@echo "make clean       - remove caches"
 
 venv:
 	python3 -m venv .venv
@@ -61,15 +58,5 @@ report:
 paper:
 	cd paper && (command -v tectonic >/dev/null && tectonic manuscript.tex || (pdflatex manuscript && bibtex manuscript && pdflatex manuscript && pdflatex manuscript))
 
-deck:
-	$(PY) src/build.py
-
-preview: deck
-	rm -rf preview
-	$(PY) src/preview.py $(DECK) preview
-
-check: deck
-	$(PY) src/validate.py $(DECK)
-
 clean:
-	rm -rf preview __pycache__ src/__pycache__ .pytest_cache
+	rm -rf __pycache__ src/__pycache__ .pytest_cache

@@ -1,1 +1,73 @@
-% placeholder
+\section{Discussion}\label{sec:discussion}
+
+\subsection{What heterogeneity costs, and what it does not}
+The usual explanation for FedAvg's shortfall in household forecasting is that homes are too different. Our
+controlled experiment does not support that explanation for final accuracy. Holding everything else fixed, doubling
+the load-shape divergence between clients changed FedAvg's test error by at most 0.0012\,kWh, comparable to the
+seed-to-seed variation.
+The fragmentation sweep shows where the gap does come from. The federated protocol with one client matches
+centralised training, and the error then grows with the logarithm of the number of clients the same data are spread
+over, whether or not those clients differ.
+Heterogeneity did matter for the speed of convergence: the traffic needed to approach centralised accuracy grew by
+about 85\,\% from random to clustered grouping. In practice this means that heterogeneity should be budgeted as a
+communication and latency cost. It is not a reason to expect a worse final model, provided that the round budget is
+large enough and the best round is chosen on validation data.
+
+This also explains why remedies aimed at client drift showed little benefit here. FedProx helped only when its
+coefficient was close to zero, and the adaptive variant performed worse. When fragmentation, rather than drift between
+heterogeneous clients, causes most of the gap, a drift penalty has little to correct and mainly slows local progress.
+
+\subsection{Implications for deployment}
+\begin{itemize}
+\item \emph{Federate few, large clients.} The single most consequential design choice was the number of clients
+the data were spread over. Aggregating homes behind a building gateway, a community energy hub or a supplier-side
+aggregator and federating those (here $K=5$) cost \EonefourfedavgKfiveGap{}\,\% in MAE relative to centralised training, with a quarter
+of the traffic of 20 clients (\EonefourfedavgKfiveMB{}\,MB), whereas meter-level federation ($K=100$) lost \EonethreefedavghouseholdGap{}\,\% and
+moved about 30 times the raw data. Where governance permits an intermediate tier, it is the cheapest accuracy lever
+available.
+\item \emph{Federation is a governance choice, not a bandwidth saving, at this scale.} A household's eight months of training
+half-hourly readings occupy about 140\,kB, only about twice the size of a single message of this small LSTM. Thirty rounds
+of federated training therefore move several times more data than uploading the readings would, and even the
+traffic to near-centralised accuracy is of the same order as the data. The case for FL in residential forecasting
+rests on data minimisation, consent and regulatory constraints, not on network load. This agrees with the qualitative
+argument of Briggs et al.~\cite{briggs2020ccai}, and it qualifies analytic estimates of large bandwidth
+savings~\cite{taik2020,savi2021}, which depend on model size, sampling rate and the number of rounds.
+\item \emph{Fine-tune locally after federating.} One epoch of local fine-tuning costs no communication. It closed
+much of the gap between FedAvg and local training per household, and it reduced the share of homes harmed by
+federation from around two thirds to below one half. Any federated household forecaster should ship with this step.
+\item \emph{Select the round on validation error.} Validation error rose temporarily in early rounds in every
+federated configuration. A fixed, short round budget can therefore deliver a worse model than a longer budget with
+validation-based selection.
+\item \emph{Watch the high-consumption tail.} The homes that gain most from pooled data are the highest consumers,
+and they are also the ones FedAvg serves worst. A distribution system operator using federated forecasts for
+congestion management should evaluate errors per consumption tier, not only on average.
+\end{itemize}
+
+\subsection{On adaptive proximal coefficients}
+HA-FedProx was designed on the premise that the dispersion of client updates measures heterogeneity. The premise is
+half right. The dispersion ratio does rank partitions by heterogeneity, but within a run it is dominated by the
+convergence of the global model: as the shared descent direction shrinks, any residual disagreement, including pure
+stochastic-gradient noise, makes the ratio approach one. A schedule proportional to $\rho_t$ therefore increases the
+proximal pull late in training regardless of the data. Two corrections suggest themselves: normalising $\rho_t$ by
+its value under a random partition, which requires a reference the server does not have, or using only early-round
+dispersion, which our data show is the most heterogeneity-sensitive. We leave both to future work. Our main
+recommendation is a caution: dissimilarity estimates computed from client updates (here, an update-space version of
+FedProx's $B$-dissimilarity) confound heterogeneity with the stage of optimisation, and any rule that adapts
+regularisation to them should be checked against this confound.
+
+\subsection{Limitations}
+\begin{itemize}
+\item \emph{Scope.} One dataset, one city, one study year and one horizon: a winter test period and a 30-minute
+horizon for 100 standard-tariff London homes. The conclusions concern a small LSTM. Larger models raise
+per-message traffic proportionally, which strengthens the communication conclusion but may change the accuracy
+results.
+\item \emph{Simulated network and privacy.} The network and stragglers are simulated, and traffic counts payload
+bytes only; protocol overhead was measured at about 1\,\%. Keeping data local is not a formal privacy guarantee.
+Updates can leak information~\cite{zhu2019leakage,geiping2020inverting}, and neither differential privacy nor secure
+aggregation was applied. Both would add accuracy or communication costs on top of those measured here.
+\item \emph{Fixed hyper-parameters.} The learning rate, model size and window were fixed a priori and shared by all
+arms. Only the proximal coefficients were tuned. A per-arm search could move individual numbers, although the
+controlled comparison is designed to make such shifts affect all arms alike.
+\item \emph{Server-side evaluation.} For efficiency the simulator scores the global model on every household's
+validation and test windows. A deployment would compute these scores on the clients and report only the metrics.
+\end{itemize}

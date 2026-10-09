@@ -1,0 +1,11 @@
+17:39:38 INFO Preprocessing: 5528 seen, 4034 eligible, 100 selected -> /Users/pushkalgupta/Desktop/Short-Term-Household-Energy-Load-Forecasting/data/processed
+9 run(s) to do with 5 worker(s)
+[1/9] E14_fedavg_K1 seed 44: test MAE 0.0813 (2013 s) | elapsed 54.8 min
+[2/9] E14_fedavg_K5 seed 43: test MAE 0.0833 (2022 s) | elapsed 55.0 min
+[3/9] E14_fedavg_K5 seed 42: test MAE 0.0823 (2026 s) | elapsed 55.1 min
+[4/9] E14_fedavg_K1 seed 42: test MAE 0.0804 (2030 s) | elapsed 55.1 min
+[5/9] E14_fedavg_K1 seed 43: test MAE 0.0808 (2031 s) | elapsed 55.1 min
+[6/9] E14_fedavg_K5 seed 44: test MAE 0.0824 (1255 s) | elapsed 75.8 min
+[7/9] E14_fedavg_K50 seed 43: test MAE 0.0875 (1252 s) | elapsed 75.9 min
+[8/9] E14_fedavg_K50 seed 42: test MAE 0.0863 (1256 s) | elapsed 75.9 min
+[9/9] E14_fedavg_K50 seed 44: test MAE 0.0869 (1250 s) | elapsed 76.0 min

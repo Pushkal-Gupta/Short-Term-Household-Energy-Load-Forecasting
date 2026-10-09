@@ -78,7 +78,9 @@ def config_from_args(args) -> dict:
     cfg = load_config(args.config, args.set)
     if getattr(args, "sample", False):
         cfg = with_overrides(cfg, **{
-            "data.num_households": 10, "partition.households_per_client": 2,
+            "data.num_households": 10,
+            # separate cache, so a quick check never replaces the full cohort in processed_dir
+            "data.processed_dir": str(Path(cfg["data"]["processed_dir"]) / "sample"), "partition.households_per_client": 2,
             "train.max_epochs": 3, "fed.rounds": 3, "seeds": [cfg.get("seed", 42)],
             "experiment_tag": f"{cfg.get('experiment_tag', 'run')}-sample",
             "results_dir": str(Path(cfg.get("results_dir", "results")) / "sample"),

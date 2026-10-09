@@ -91,6 +91,13 @@ def error_vs_bytes(curves: dict, path: Path, central_mae: float | None, tag=None
     if central_mae is not None:
         ax.axhline(central_mae, color=COLORS["centralized"], ls=":", lw=1.0, label="Centralised (val)")
     ax.set_xscale("log")
+    from matplotlib.ticker import FixedLocator, NullFormatter, NullLocator
+    ticks = [t for t in (1, 2, 5, 10, 20, 50, 100, 200) if
+             ax.get_xlim()[0] <= t <= ax.get_xlim()[1]]
+    ax.xaxis.set_major_locator(FixedLocator(ticks))
+    ax.xaxis.set_major_formatter(matplotlib.ticker.FixedFormatter([str(t) for t in ticks]))
+    ax.xaxis.set_minor_locator(NullLocator())
+    ax.xaxis.set_minor_formatter(NullFormatter())
     ax.set_xlabel("Cumulative traffic (MB, log scale)")
     ax.set_ylabel("Validation MAE (kWh / half-hour)")
     ax.set_title("Accuracy bought per megabyte", loc="left")
@@ -118,21 +125,29 @@ def prediction_example(frames: dict, hid: str, path: Path, days: int = 3, tag=No
 
 
 def heterogeneity_response(df: pd.DataFrame, path: Path, central_mae: float, tag=None):
-    """df rows: algorithm, H_mean, test_mae_mean, test_mae_std, label."""
+    """Two panels against the measured load-shape divergence H_JS between clients:
+    (a) final test MAE, (b) megabytes needed to come within eps of centralised validation MAE."""
     style()
-    fig, ax = plt.subplots(figsize=(6.2, 3.6))
+    fig, axes = plt.subplots(1, 2, figsize=(8.4, 3.4))
     for alg, g in df.groupby("algorithm"):
-        g = g.sort_values("H_mean")
-        ax.errorbar(g["H_mean"], g["test_mae_mean"], yerr=g["test_mae_std"], color=COLORS[alg],
-                    marker="o", ms=5, capsize=2, lw=1.6, label=LABELS[alg])
-    for _, r in df[df["algorithm"] == "fedavg"].iterrows():
-        ax.annotate(r["label"], (r["H_mean"], r["test_mae_mean"]), textcoords="offset points",
-                    xytext=(4, 6), fontsize=7, color=MUTED)
-    ax.axhline(central_mae, color=COLORS["centralized"], ls=":", lw=1.0, label="Centralised")
-    ax.set_xlabel("Measured heterogeneity index H between clients")
-    ax.set_ylabel("Test MAE (kWh / half-hour)")
-    ax.set_title("Heterogeneity–error response", loc="left")
-    _legend_right(ax)
+        g = g.sort_values("H_JS_mean")
+        axes[0].errorbar(g["H_JS_mean"], g["test_mae_mean"], yerr=g["test_mae_std"], color=COLORS[alg],
+                         marker="o", ms=4.5, capsize=2, lw=1.6, label=LABELS[alg])
+        if "B_eps_MB_mean" in g and g["B_eps_MB_mean"].notna().any():
+            axes[1].plot(g["H_JS_mean"], g["B_eps_MB_mean"], color=COLORS[alg], marker="o", ms=4.5, lw=1.6,
+                         label=LABELS[alg])
+    axes[0].axhline(central_mae, color=COLORS["centralized"], ls=":", lw=1.0, label="Centralised")
+    fa = df[df["algorithm"] == "fedavg"].sort_values("H_JS_mean")
+    for ax in axes:
+        ax.set_xlabel("Load-shape divergence between clients, $H_{JS}$")
+        top = ax.get_ylim()[1]
+        for _, r in fa.iterrows():
+            ax.text(r["H_JS_mean"], top, r["label"], ha="center", va="bottom", fontsize=7, color=MUTED)
+    axes[0].set_ylabel("Test MAE (kWh / half-hour)")
+    axes[0].set_title("(a) Final accuracy", loc="left", pad=14)
+    axes[1].set_ylabel("MB to reach centralised + 10 % (B@ε)")
+    axes[1].set_title("(b) Communication price of accuracy", loc="left", pad=14)
+    axes[1].legend(fontsize=7.5, loc="upper left", bbox_to_anchor=(1.01, 1.0))
     _save(fig, path, tag)
 
 
@@ -174,7 +189,8 @@ def benefit_distribution(benefits: dict, path: Path, tag=None):
     fig, ax = plt.subplots(figsize=(6.2, 3.4))
     for label, (alg, b) in benefits.items():
         x = np.sort(b)
-        ax.plot(x, np.arange(1, len(x) + 1) / len(x), color=COLORS[alg], label=label)
+        ax.plot(x, np.arange(1, len(x) + 1) / len(x), color=COLORS[alg], label=label,
+                ls="--" if "household" in label.lower() else "-")
     ax.axvline(0, color=MUTED, lw=0.8)
     ax.set_xlabel("Federation benefit per household: MAE_local − MAE_fed (kWh)")
     ax.set_ylabel("Share of households (CDF)")
@@ -196,7 +212,7 @@ def rho_vs_round(curves: dict, path: Path, tag=None):
     _rounds_axis(ax)
     ax.set_ylim(0, 1.02)
     ax.set_ylabel("Update disagreement ρ_t")
-    ax.set_title("ρ_t follows training progress, not the partition", loc="left")
+    ax.set_title("Update disagreement ρ_t per round (FedAvg)", loc="left")
     _legend_right(ax)
     _save(fig, path, tag)
 
@@ -220,3 +236,40 @@ def fragmentation(df: pd.DataFrame, path: Path, refs: dict, tag=None):
     ax.set_title("Cost of fragmenting the same data", loc="left")
     _legend_right(ax)
     _save(fig, path, tag)
+
+
+def graphical_abstract(rows: list, beps: dict, local_gap: float, path: Path):
+    """Journal graphical abstract (wide format, >= 1328 x 531 px).
+    rows: [(label, gap_to_central_pct, kind)] with kind 'K' (fragmentation) or 'H' (heterogeneity at K=20);
+    beps: label -> MB to come within eps of centralised validation MAE."""
+    style()
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13.3, 5.6), gridspec_kw={"width_ratios": [1.5, 1.0]})
+    fig.subplots_adjust(left=0.2, right=0.98, top=0.8, bottom=0.2, wspace=0.3)
+    fig.suptitle("Federated LSTM load forecasting on 100 London homes: same data, same model, one factor changed "
+                 "at a time", x=0.02, ha="left", fontsize=13, weight="bold", color=INK)
+    rows = rows[::-1]
+    shade = {"K": COLORS["fedavg"], "H": "#f6b48a"}
+    vals = [g for _, g, _ in rows]
+    ax1.barh(range(len(rows)), vals, color=[shade[k] for *_, k in rows], height=0.62, edgecolor="white")
+    ax1.axvline(local_gap, color=COLORS["local"], ls=":", lw=1.6)
+    ax1.text(local_gap, len(rows) - 1, f"  local-only models ({local_gap:+.1f} %)", color=INK, fontsize=9,
+             va="center")
+    ax1.set_yticks(range(len(rows)), [lab for lab, *_ in rows], fontsize=10)
+    for i, v in enumerate(vals):
+        ax1.text(max(v, 0) + 0.15, i, f"{v:+.1f} %", va="center", fontsize=9.5, color=INK)
+    ax1.set_xlabel("FedAvg test MAE above centralised training (%)")
+    ax1.set_title("Accuracy: the gap grows with the number of clients K;\n"
+                  "heterogeneity at fixed K (light bars) barely moves it", loc="left", fontsize=11)
+    ax1.set_xlim(0, max(max(vals), local_gap) * 1.22)
+
+    labs = list(beps)
+    ax2.bar(range(len(labs)), [beps[k] for k in labs],
+            color=[COLORS["centralized"]] + [COLORS["fedavg"]] * (len(labs) - 1), width=0.6, edgecolor="white")
+    for i, k in enumerate(labs):
+        ax2.text(i, beps[k] + 0.5, f"{beps[k]:.1f} MB", ha="center", fontsize=9.5, color=INK)
+    ax2.set_xticks(range(len(labs)), labs, fontsize=9.5)
+    ax2.set_ylabel("Megabytes")
+    ax2.set_ylim(0, max(beps.values()) * 1.18)
+    ax2.set_title("Bandwidth (K = 20): heterogeneity raises the bytes\nneeded to come within 10 % of centralised",
+                  loc="left", fontsize=11)
+    _save(fig, path, None)

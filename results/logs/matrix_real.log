@@ -33,3 +33,15 @@
 [31/45] E10_hafedprox_a0.1 seed 44: test MAE 0.0856 (2394 s) | elapsed 116.2 min
 [32/45] E10_hafedprox_strong seed 43: test MAE 0.0866 (2394 s) | elapsed 116.4 min
 [33/45] E10_hafedprox_strong seed 44: test MAE 0.0862 (2390 s) | elapsed 116.8 min
+[34/45] E12_fedavg_fp16_moderate seed 42: test MAE 0.0864 (2244 s) | elapsed 134.3 min
+[35/45] E12_fedavg_fp16_moderate seed 43: test MAE 0.0853 (2423 s) | elapsed 176.8 min
+[36/45] E12_fedavg_fp16_moderate seed 44: test MAE 0.0856 (2425 s) | elapsed 177.2 min
+[37/45] E13_fedavg_household seed 42: test MAE 0.0888 (2476 s) | elapsed 178.1 min
+[38/45] E13_fedavg_household seed 43: test MAE 0.0909 (2473 s) | elapsed 178.3 min
+[39/45] E13_fedavg_household seed 44: test MAE 0.0886 (2479 s) | elapsed 178.5 min
+[40/45] E13_fedprox_household seed 42: test MAE 0.0890 (2546 s) | elapsed 179.8 min
+[41/45] E13_fedprox_household seed 43: test MAE 0.0907 (2530 s) | elapsed 179.9 min
+[42/45] E13_fedprox_household seed 44: test MAE 0.0881 (2185 s) | elapsed 191.6 min
+[43/45] E13_hafedprox_household seed 42: test MAE 0.0895 (1670 s) | elapsed 204.6 min
+[44/45] E13_hafedprox_household seed 43: test MAE 0.0905 (1663 s) | elapsed 205.0 min
+[45/45] E13_hafedprox_household seed 44: test MAE 0.0903 (1643 s) | elapsed 205.5 min

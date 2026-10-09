@@ -53,7 +53,9 @@ training consumption over the 168 hours of the week. With $\mathrm{JS}$ the Jens
 base 2~\cite{lin1991divergence} and $m_k$ the mean load of client $k$,
 \begin{equation}
 H_{\mathrm{JS}}=\binom{K}{2}^{-1}\sum_{k<l}\mathrm{JS}(q_k\,\Vert\,q_l),\qquad
-H_{\mathrm{CV}}=\frac{\mathrm{sd}(m_k)}{\mathrm{mean}(m_k)},\qquad
+H_{\mathrm{CV}}=\frac{\mathrm{sd}(m_k)}{\mathrm{mean}(m_k)},
+\end{equation}
+\begin{equation}
 H=H_{\mathrm{JS}}+\frac{H_{\mathrm{CV}}}{1+H_{\mathrm{CV}}}.
 \end{equation}
 $H_{\mathrm{JS}}\in[0,1]$ measures differences in \emph{when} clients consume, and the bounded transform of

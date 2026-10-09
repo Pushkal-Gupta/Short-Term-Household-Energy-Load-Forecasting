@@ -35,6 +35,7 @@ groupings, but not the cohort, the profile clusters or the split.
 \begin{table}[t]
 \centering\small
 \caption{Experimental matrix. All rows use the same 100 households, split, model and budget.}\label{tab:matrix}
+\begin{adjustbox}{max width=\textwidth}
 \begin{tabular}{lll}
 \toprule
 ID & Arm(s) & Factor varied \\
@@ -52,6 +53,7 @@ E13 & FedAvg, FedProx, HA-FedProx & one household per client ($K=100$) \\
 E14 & FedAvg & random grouping, $K\in\{1,5,50\}$ \\
 \bottomrule
 \end{tabular}
+\end{adjustbox}
 \end{table}
 
 \subsection{Implementation}
