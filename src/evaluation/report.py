@@ -151,7 +151,8 @@ def build_report(cfg: dict, write_paper: bool | None = None) -> dict:
     order = ["E1_local", "E2_centralized", "E3_fedavg_iid", "E4_fedavg_moderate", "E5_fedprox_moderate",
              "E10_hafedprox_a0.3", "E6_fedavg_strong", "E7_fedprox_strong", "E10_hafedprox_strong",
              "E8_fedavg_partial", "E9_fedprox_partial", "E11_hafedprox_partial", "E12_fedavg_fp16_moderate",
-             "E13_fedavg_household", "E13_fedprox_household", "E13_hafedprox_household"]
+             "E13_fedavg_household", "E13_fedprox_household", "E13_hafedprox_household",
+             "E14_fedavg_K1", "E14_fedavg_K5", "E14_fedavg_K50"]
     for name in order:
         r = S[S["experiment"] == name]
         if r.empty:
@@ -194,6 +195,57 @@ def build_report(cfg: dict, write_paper: bool | None = None) -> dict:
     H = pd.DataFrame(het_rows)
     H.to_csv(mdir / "heterogeneity.csv", index=False)
 
+    # ---- fragmentation: same homes, random grouping, K clients (K=100 is household mode) ----
+    frag_names = {1: "E14_fedavg_K1", 5: "E14_fedavg_K5", 20: "E3_fedavg_iid", 50: "E14_fedavg_K50",
+                  100: "E13_fedavg_household"}
+    fr = []
+    for K, name in frag_names.items():
+        r = S[S["experiment"] == name]
+        if r.empty:
+            continue
+        r = r.iloc[0]
+        fr.append({"K": K, "experiment": name, "test_mae_mean": r["test_mae_mean"], "test_mae_std": r["test_mae_std"],
+                   "ft_mae_mean": r.get("ft_mae_mean", np.nan), "H_mean": r["H_mean"],
+                   "mean_rho": _mean_rho(rundir, name), "best_round_mean": r["best_round_mean"],
+                   "gap_to_central_pct": 100 * (r["test_mae_mean"] / cmae - 1)})
+    FR = pd.DataFrame(fr)
+    FR.to_csv(mdir / "fragmentation.csv", index=False)
+
+    # ---- gap decomposition: walk from centralised to the hardest federated setting, one factor at a time ----
+    steps = [("Centralised (pooled raw data)", "E2_centralized"),
+             ("+ round protocol, 1 client (K=1)", "E14_fedavg_K1"),
+             ("+ split over 20 clients, random grouping", "E3_fedavg_iid"),
+             ("+ label-skewed grouping (alpha=0.3)", "E4_fedavg_moderate"),
+             ("+ 50% participation, 20% stragglers", "E8_fedavg_partial"),
+             ("cluster grouping instead (strong non-IID)", "E6_fedavg_strong"),
+             ("1 home = 1 client (K=100)", "E13_fedavg_household")]
+    dec, prev = [], None
+    for lab, name in steps:
+        r = S[S["experiment"] == name]
+        if r.empty:
+            continue
+        m = float(r["test_mae_mean"].iloc[0])
+        dec.append({"step": lab, "experiment": name, "test_mae_mean": m,
+                    "test_mae_std": float(r["test_mae_std"].iloc[0]) if pd.notna(r["test_mae_std"].iloc[0]) else np.nan,
+                    "delta_vs_previous": np.nan if prev is None or "instead" in lab or "1 home" in lab else m - prev,
+                    "gap_to_central_pct": 100 * (m / cmae - 1)})
+        if "instead" not in lab and "1 home" not in lab:
+            prev = m
+    DEC = pd.DataFrame(dec)
+    DEC.to_csv(mdir / "gap_decomposition.csv", index=False)
+
+    # ---- does rho measure heterogeneity? per-run mean rho (rounds 2..T) against measured H ----
+    rr = []
+    for _, r in main[(main["method"] == "federated") & (main["algorithm"] == "fedavg")].iterrows():
+        f = rundir / f"{r['experiment']}__seed{r['seed']}_history.csv"
+        h = pd.read_csv(f)
+        late = h[h["round"] > 1]["update_disagreement_rho"]
+        rr.append({"experiment": r["experiment"], "seed": r["seed"], "H": r.get("H", np.nan),
+                   "num_clients": r.get("num_clients", np.nan), "rho_round1": float(h["update_disagreement_rho"].iloc[0]),
+                   "rho_mean": float(late.mean()), "rho_last": float(h["update_disagreement_rho"].iloc[-1])})
+    RH = pd.DataFrame(rr)
+    RH.to_csv(mdir / "rho_vs_heterogeneity.csv", index=False)
+
     # ---- paired statistics over households ----
     hh = {n: _households(rundir, n) for n in S["experiment"]}
     pairs = [("E4_fedavg_moderate", "E1_local"), ("E4_fedavg_moderate", "E2_centralized"),
@@ -204,14 +256,25 @@ def build_report(cfg: dict, write_paper: bool | None = None) -> dict:
              ("E11_hafedprox_partial", "E8_fedavg_partial"), ("E11_hafedprox_partial", "E9_fedprox_partial"),
              ("E6_fedavg_strong", "E3_fedavg_iid"), ("E13_fedavg_household", "E1_local"),
              ("E13_fedavg_household", "E2_centralized"), ("E13_hafedprox_household", "E13_fedavg_household"),
-             ("E12_fedavg_fp16_moderate", "E4_fedavg_moderate"), ("E2_centralized", "E1_local")]
+             ("E12_fedavg_fp16_moderate", "E4_fedavg_moderate"), ("E2_centralized", "E1_local"),
+             ("E14_fedavg_K1", "E2_centralized"), ("E3_fedavg_iid", "E14_fedavg_K1"),
+             ("E4_fedavg_moderate:ft", "E1_local"), ("E4_fedavg_moderate:ft", "E2_centralized"),
+             ("E13_fedavg_household:ft", "E1_local")]
+
+    def _col(key):
+        name, _, ft = key.partition(":")
+        h = hh.get(name)
+        col = "ft_mae" if ft else "mae"
+        return None if h is None or col not in h else h[col]
+
     st = []
     for a, b in pairs:
-        if hh.get(a) is None or hh.get(b) is None:
+        A, B = _col(a), _col(b)
+        if A is None or B is None:
             continue
-        med, p, n = _wilcoxon(hh[a]["mae"], hh[b]["mae"])
+        med, p, n = _wilcoxon(A, B)
         st.append({"A": a, "B": b, "median_diff_mae_A_minus_B": med, "p_value": p, "n_households": n,
-                   "share_households_A_better": float((hh[a]["mae"] < hh[b]["mae"].reindex(hh[a].index)).mean())})
+                   "share_households_A_better": float((A < B.reindex(A.index)).mean())})
     ST = pd.DataFrame(st)
     if len(ST):
         ST["p_holm"] = _holm(ST["p_value"].to_numpy())
@@ -247,10 +310,23 @@ def build_report(cfg: dict, write_paper: bool | None = None) -> dict:
     STR.to_csv(mdir / "equity_by_stratum.csv", index=False)
 
     _make_plots(cfg, S, H, STR, hh, rundir, pdir, tag, central_val)
+    hist_rho = {lab: _history(rundir, n) for n, lab in [("E3_fedavg_iid", "random"), ("E4_fedavg_moderate", "α=0.3"),
+                                                        ("E6_fedavg_strong", "cluster"),
+                                                        ("E13_fedavg_household", "1 home = 1 client")]}
+    hist_rho = {k: v for k, v in hist_rho.items() if v is not None}
+    if hist_rho:
+        plots.rho_vs_round(hist_rho, pdir / "rho_vs_round.png", tag)
+    if len(FR) >= 2:
+        refs = {}
+        if len(cmae_s := S.loc[S["experiment"] == "E2_centralized", "test_mae_mean"]):
+            refs["Centralised"] = ("centralized", float(cmae_s.iloc[0]))
+        if len(lm := S.loc[S["experiment"] == "E1_local", "test_mae_mean"]):
+            refs["Local-only"] = ("local", float(lm.iloc[0]))
+        plots.fragmentation(FR, pdir / "fragmentation.png", refs, tag)
     if write_paper is None:
         write_paper = "synthetic" not in tag.lower() and "sample" not in tag.lower()
     if write_paper:
-        _latex(S, C, H, ST, EQ, STR, cfg, central_val)
+        _latex(S, C, H, ST, EQ, STR, cfg, central_val, FR, DEC, RH)
     return {"comparison": C, "summary": S}
 
 
@@ -277,6 +353,11 @@ def describe(name: str) -> str:
              "E12_fedavg_fp16_moderate": "FedAvg, α=0.3, float16 updates"}
     if name in fixed:
         return fixed[name]
+    base, _, ft = name.partition(":")
+    if ft:
+        return describe(base) + " + local FT"
+    if name.startswith("E14_"):
+        return f"FedAvg, K={name.rsplit('K', 1)[1]} client(s), random"
     alg = "HA-FedProx" if "hafedprox" in name else "FedProx" if "fedprox" in name else "FedAvg"
     if "household" in name:
         return f"{alg}, 1 household = 1 client"
@@ -376,7 +457,7 @@ def _prediction_plot(cfg, S, pdir, tag):
 
 # ───────────────────────────── LaTeX for the manuscript ─────────────────────────────
 
-def _latex(S, C, H, ST, EQ, STR, cfg, central_val):
+def _latex(S, C, H, ST, EQ, STR, cfg, central_val, FR=None, DEC=None, RH=None):
     out = resolve("paper/generated")
     out.mkdir(parents=True, exist_ok=True)
     lines = [r"\begin{tabular}{lrrrrrr}", r"\toprule",
@@ -431,6 +512,18 @@ def _latex(S, C, H, ST, EQ, STR, cfg, central_val):
             mac[f"{key}H"] = f"{r.H_mean:.3f}"
         if pd.notna(getattr(r, "best_round_mean", np.nan)):
             mac[f"{key}Round"] = f"{r.best_round_mean:.1f}"
+        if pd.notna(getattr(r, "ft_mae_mean", np.nan)):
+            mac[f"{key}FT"] = f"{r.ft_mae_mean:.4f}"
+        if pd.notna(getattr(r, "test_mae_std", np.nan)):
+            mac[f"{key}MAEsd"] = f"{r.test_mae_std:.4f}"
+        if pd.notna(getattr(r, "R_eps_mean", np.nan)):
+            mac[f"{key}Reps"] = f"{r.R_eps_mean:.1f}"
+            mac[f"{key}Beps"] = f"{r.B_eps_MB_mean:.1f}"
+        if pd.notna(getattr(r, "hh_mae_p90_mean", np.nan)):
+            mac[f"{key}PninetyMAE"] = f"{r.hh_mae_p90_mean:.4f}"
+        cm = S.loc[S["experiment"] == "E2_centralized", "test_mae_mean"]
+        if len(cm):
+            mac[f"{key}Gap"] = f"{100 * (r.test_mae_mean / float(cm.iloc[0]) - 1):+.1f}"
     any_run = S.iloc[0]
     mac.update({"NumHouseholds": str(int(any_run["num_households"])), "NumParams": str(int(any_run["num_params"])),
                 "PayloadKB": f"{4 * int(any_run['num_params']) / 1e3:.1f}"})
@@ -443,6 +536,46 @@ def _latex(S, C, H, ST, EQ, STR, cfg, central_val):
         t = json.loads(tpath.read_text())
         mac.update({"TunedMuFedProx": f"{t.get('mu_fedprox', float('nan')):g}",
                     "TunedMuHA": f"{t.get('mu_hafedprox', float('nan')):g}"})
+    if FR is not None and len(FR):
+        L = [r"\begin{tabular}{rrrrrr}", r"\toprule",
+             r"$K$ & homes/client & Test MAE & FT MAE & $\bar\rho$ & Gap to central (\%) \\", r"\midrule"]
+        for r in FR.itertuples():
+            ft = f"{r.ft_mae_mean:.4f}" if pd.notna(r.ft_mae_mean) else "--"
+            L.append(f"{r.K} & {100 // r.K} & {_pm(r.test_mae_mean, r.test_mae_std)} & {ft} & "
+                     f"{r.mean_rho:.3f} & {r.gap_to_central_pct:+.1f} \\\\")
+        L += [r"\bottomrule", r"\end{tabular}"]
+        (out / "table_fragmentation.tex").write_text("\n".join(L) + "\n")
+    if DEC is not None and len(DEC):
+        L = [r"\begin{tabular}{lrrr}", r"\toprule",
+             r"Setting & Test MAE & $\Delta$ vs previous & Gap to central (\%) \\", r"\midrule"]
+        for r in DEC.itertuples():
+            d = f"{r.delta_vs_previous:+.4f}" if pd.notna(r.delta_vs_previous) else "--"
+            L.append(f"{_tex(r.step).replace('alpha', '$\\alpha$')} & {_pm(r.test_mae_mean, r.test_mae_std)} & {d} & "
+                     f"{r.gap_to_central_pct:+.1f} \\\\")
+        L += [r"\bottomrule", r"\end{tabular}"]
+        (out / "table_decomposition.tex").write_text("\n".join(L) + "\n")
+    if RH is not None and len(RH) >= 4:
+        from scipy.stats import spearmanr
+        sub = RH[RH["num_clients"] > 1].dropna(subset=["H"])
+        if len(sub) >= 4:
+            rs, rp = spearmanr(sub["H"], sub["rho_mean"])
+            r1s, r1p = spearmanr(sub["H"], sub["rho_round1"])
+            mac.update({"RhoHSpearman": f"{rs:+.2f}", "RhoHSpearmanP": _p(rp), "RhoHRuns": str(len(sub)),
+                        "RhoOneHSpearman": f"{r1s:+.2f}", "RhoOneHSpearmanP": _p(r1p)})
+        mac.update({"RhoRoundOne": f"{RH['rho_round1'].mean():.2f}", "RhoLast": f"{RH['rho_last'].mean():.2f}",
+                    "RhoMin": f"{RH['rho_mean'].min():.2f}", "RhoMax": f"{RH['rho_mean'].max():.2f}"})
+    if len(ST):
+        for r in ST.itertuples():
+            k = re.sub(r"[^A-Za-z]", "", (r.A + "vs" + r.B).translate(str.maketrans("0123456789.", "abcdefghijp")))
+            mac[f"St{k}Better"] = f"{100 * r.share_households_A_better:.0f}"
+            mac[f"St{k}P"] = _p(r.p_holm)
+            mac[f"St{k}Med"] = f"{r.median_diff_mae_A_minus_B:+.4f}"
+    if len(EQ):
+        for r in EQ.itertuples():
+            k = re.sub(r"[^A-Za-z]", "", r.experiment.translate(str.maketrans("0123456789.", "abcdefghijp")))
+            mac[f"Eq{k}Harmed"] = f"{100 * r.share_harmed:.0f}"
+            if hasattr(r, "ft_share_harmed") and pd.notna(r.ft_share_harmed):
+                mac[f"Eq{k}FTHarmed"] = f"{100 * r.ft_share_harmed:.0f}"
     (out / "numbers.tex").write_text("".join(f"\\newcommand{{\\{k}}}{{{v}}}\n" for k, v in mac.items()))
     figdir = resolve("paper/figures")
     figdir.mkdir(parents=True, exist_ok=True)

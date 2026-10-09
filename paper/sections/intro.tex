@@ -1,0 +1,66 @@
+\section{Introduction}\label{sec:intro}
+
+Short-term load forecasts at the level of a single household feed demand response, home energy management, local
+flexibility markets and the operation of low-voltage networks that now host heat pumps, electric vehicles and rooftop
+photovoltaics. Deep recurrent models, in particular the long short-term memory (LSTM) network~\cite{hochreiter1997lstm},
+forecast individual households better than per-home statistical models when they are trained on many households
+at once~\cite{kong2019stlf}. Pooling the readings in one place, however, is what smart-meter regulation and customer
+consent increasingly discourage: half-hourly consumption reveals occupancy, routines and appliance use. Federated
+learning (FL)~\cite{mcmahan2017fedavg,kairouz2021advances} offers an alternative. Each meter, home gateway or community
+energy hub trains on its own data, and only model weights travel to an aggregator.
+
+A large body of work now applies FL to residential load forecasting
+\cite{fernndez2022,fekri2022,gholizadeh2022,widmer2023,qu2023,liu2023,fekri2023,das2026,wang2026,tibermacine2026}.
+Two premises run through it. The first is that household data are strongly non-identically distributed (non-IID),
+so that plain federated averaging (FedAvg) suffers, and that remedies such as the proximal term of
+FedProx~\cite{li2020fedprox}, clustering~\cite{gholizadeh2022,dogra2023} or personalisation~\cite{qu2023,widmer2023,das2026}
+are needed. The second is that FL is the communication-light, privacy-preserving option. Both premises have been tested only in
+isolation. On LCL, Briggs et al.~\cite{briggs2022} found plain FedAvg worse than purely local models and recovered
+the loss with clustering and local fine-tuning. Taïk and Cherkaoui~\cite{taik2020} and Savi and
+Olivadese~\cite{savi2021} estimated large bandwidth savings over raw-data upload, whereas Briggs et
+al.~\cite{briggs2020ccai} argued, without measurement, that weight vectors cost more bandwidth than half-hourly
+readings on constrained meter links. Studies differ in dataset, cohort, horizon, model, number of rounds and evaluation
+protocol, and almost none holds the households and the test set fixed while varying only how the data are split
+across clients. As a result, the field cannot say how much of the accuracy lost by FL is caused by heterogeneity,
+how much by splitting the data at all, and how much by the federated training protocol itself. Nor can it say
+whether the bytes exchanged during training are small compared with simply uploading the raw readings.
+
+This paper answers these questions with a controlled experiment on the Low Carbon London (LCL) smart-meter
+trial~\cite{ukpn2015lcl}. We fix a stratified cohort of \NumHouseholds{} standard-tariff London households, one
+chronological train/validation/test split, one LSTM of \NumParams{} parameters and one training budget. We then change
+exactly one factor at a time: whether data are pooled, the number of clients the same homes are split into, how
+homes are grouped into clients (from random to fully clustered by load profile), client participation and stragglers,
+the aggregation rule, and the precision of the transmitted update. Every comparison uses the same test half-hours,
+so differences in error are attributable to the manipulated factor alone.
+
+\paragraph{Contributions}
+\begin{enumerate}
+\item \textbf{A controlled decomposition protocol for federated load forecasting.} We separate the gap between
+federated and centralised training into the cost of the round protocol (one client holding all data), the cost of
+fragmentation (the same homes split over $K$ clients), the cost of heterogeneity (a Dirichlet dial over real
+load-profile clusters) and the cost of partial participation. Heterogeneity is reported as a \emph{measured}
+index $H$ between clients, computed on training data only, rather than as a nominal partition label.
+\item \textbf{Communication-priced accuracy.} Prior estimates of FL's bandwidth advantage are analytic, derived from model and data
+sizes~\cite{taik2020}, or summarised as an overall ratio of exchanged data~\cite{savi2021}. We count every byte uploaded and downloaded and introduce two
+budget metrics, R@$\varepsilon$ and B@$\varepsilon$: the rounds and megabytes a federation needs to come within
+$\varepsilon$ of centralised validation error. We compare these with the volume of the raw training data itself.
+\item \textbf{Equity of federation.} We report, household by household, who gains and who loses relative to training
+alone, by consumption quintile, with paired signed-rank tests~\cite{wilcoxon1945} and Holm
+correction~\cite{holm1979}. We also evaluate a zero-communication personalisation step, one epoch of local fine-tuning
+of the global model.
+\item \textbf{An update-dissimilarity schedule for the proximal coefficient, and why it does not help here.}
+Adaptive proximal coefficients exist, driven by the training loss~\cite{li2020fedprox} or by a local-versus-global
+performance index~\cite{mhou2025hapi}. HA-FedProx instead schedules $\mu$ from a parameter-free, bounded, per-round
+estimate of FedProx's own $B$-dissimilarity~\cite{li2020fedprox}, computed in update space from messages the
+server already receives. It is closely related to gradient diversity~\cite{yin2018diversity}. We show that on
+household load data this signal tracks training progress rather than data heterogeneity, and we explain why. This
+negative result applies to any scheme that adapts regularisation to observed update dissimilarity.
+\item \textbf{An open, reproducible pipeline.} Preprocessing, partitioning, all arms, byte accounting, statistics,
+figures and the tables of this paper are generated by one public code base from the public LCL release. A Flower
+backend~\cite{beutel2020flower} reproduces the simulator exactly.
+\end{enumerate}
+
+Section~\ref{sec:related} reviews related work. Section~\ref{sec:method} defines the task, the arms, the
+heterogeneity index, HA-FedProx and the communication metrics. Section~\ref{sec:setup} describes data and protocol.
+Section~\ref{sec:results} reports the results, Section~\ref{sec:discussion} discusses their implications for
+deployment, and Section~\ref{sec:conclusion} concludes.

@@ -46,3 +46,9 @@ main:
   - {name: E13_fedavg_household,    method: federated, set: {fed.algorithm: fedavg,    partition.mode: household}}
   - {name: E13_fedprox_household,   method: federated, set: {fed.algorithm: fedprox,   fed.mu: "@mu_fedprox",   partition.mode: household}}
   - {name: E13_hafedprox_household, method: federated, set: {fed.algorithm: hafedprox, fed.mu: "@mu_hafedprox", partition.mode: household}}
+  # ---- E14: fragmentation sweep. Same 100 homes, random grouping, K = 1, 5, (20 = E3), 50, (100 = E13) ----
+  # K = 1 runs the federated protocol on one client that holds everything, which isolates the cost of the
+  # round protocol itself (optimiser reset each round, best-round selection) from the cost of splitting data.
+  - {name: E14_fedavg_K1,  method: federated, set: {fed.algorithm: fedavg, partition.strategy: iid, partition.households_per_client: 100}}
+  - {name: E14_fedavg_K5,  method: federated, set: {fed.algorithm: fedavg, partition.strategy: iid, partition.households_per_client: 20}}
+  - {name: E14_fedavg_K50, method: federated, set: {fed.algorithm: fedavg, partition.strategy: iid, partition.households_per_client: 2}}

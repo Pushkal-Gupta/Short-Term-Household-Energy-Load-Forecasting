@@ -1,0 +1,2 @@
+K,experiment,test_mae_mean,test_mae_std,ft_mae_mean,H_mean,mean_rho,best_round_mean,gap_to_central_pct
+20,E3_fedavg_iid,0.08527297741838262,0.0009043708716759112,0.08338224024413775,0.25528188253415635,0.8555153415639184,23.0,5.185018537052222

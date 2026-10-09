@@ -1,0 +1,73 @@
+\section{Related work}\label{sec:related}
+
+\subsection{Household load forecasting with deep learning}
+Household load is volatile and dominated by occupant behaviour. Kong et al.~\cite{kong2019stlf} showed that LSTMs
+outperform shallow and statistical baselines for individual residential customers. Shi et al.~\cite{shi2018pdrnn}
+showed that pooling the data of neighbouring households reduces over-fitting, the effect that motivates
+collaborative training in the first place. Later work added embeddings, bidirectional recurrences and multi-task
+sharing~\cite{aurangzeb2024,xiao2023}, as well as clustering of consumption profiles~\cite{dab2023}. These gains assume
+the data are pooled.
+
+\subsection{Federated household load forecasting}
+FL for residential forecasting has grown quickly~\cite{fernndez2022,fekri2022,gholizadeh2022,yang2023,liu2023,fekri2023,
+qu2023,wang2023,khalil2023,widmer2023,dogra2023,sarmento2024,abdulla2024,singh2024,manzoor2024,mao2024,huang2024,
+mostafanezhad2025,kaur2025,shao2026,das2026,wang2026,tibermacine2026,he2026,lu2024fds,husnoo2024,he2023hfl,
+duttagupta2023,rahman2025multihop}.
+The findings that matter here disagree about whether federation pays off at all.
+\begin{itemize}
+\item \emph{Federation can lose to local models.} The closest study to ours is Briggs et al.~\cite{briggs2022}, who
+trained a two-layer LSTM with FedAvg on 100 LCL households. Plain FL was 7.6\,\% worse in mean RMSE than localised
+learning, clustering reduced the shortfall to 4.7\,\%, and local fine-tuning made the federated models better than
+local ones. Gholizadeh and Musilek~\cite{gholizadeh2022} likewise found local learning best on average for individual
+Canadian homes.
+\item \emph{Federation can match or beat local models.} Fekri et al.~\cite{fekri2022} found FedAvg comparable to or
+better than per-meter models on 19 Ontario homes.
+\item \emph{Remedies for heterogeneity.} Personalised and clustered variants~\cite{qu2023,widmer2023,dogra2023,das2026,
+wang2026,lu2024fds} are motivated by heterogeneity among households.
+\end{itemize}
+None of these studies varies heterogeneity while holding the households and the test set fixed, so the share of the
+federated gap caused by heterogeneity, rather than by data fragmentation or the training protocol, has not been
+measured. We revisit the LCL comparison of Briggs et al. under a controlled protocol, with per-household paired
+statistics, and add that decomposition.
+
+\subsection{Communication cost}
+Communication efficiency was a founding motivation of FL~\cite{mcmahan2017fedavg,konecny2016comm}.
+In load forecasting, the evidence points in both directions:
+\begin{itemize}
+\item Taïk and Cherkaoui~\cite{taik2020} estimated analytically that FL saves 90--97\,\% of the network load of
+uploading data.
+\item Savi and Olivadese~\cite{savi2021} reported up to 50 times less exchanged data at sub-hourly resolution.
+\item Briggs et al.~\cite{briggs2020ccai} argued, without measurement, that exchanging weight vectors costs more
+bandwidth than sending half-hourly readings over constrained smart-meter links.
+\end{itemize}
+Most FL forecasting studies count rounds rather than bytes~\cite{fekri2022}, or report payload per round without
+comparing it with the data~\cite{bose2023pl}. We measure upload and download bytes per round, the bytes needed to
+reach a given accuracy, and the raw-data volume they replace.
+
+\subsection{Non-IID data and proximal regularisation}
+Statistical heterogeneity slows and biases FedAvg~\cite{zhao2018noniid,hsieh2020quagmire,kairouz2021advances}.
+Remedies include:
+\begin{itemize}
+\item proximal regularisation (FedProx~\cite{li2020fedprox});
+\item control variates (SCAFFOLD~\cite{karimireddy2020scaffold});
+\item dynamic regularisation (FedDyn~\cite{acar2021feddyn});
+\item normalised averaging (FedNova~\cite{wang2020fednova});
+\item adaptive server optimisers~\cite{reddi2021fedopt};
+\item personalisation~\cite{fallah2020perfedavg,li2021ditto};
+\item fairness-aware objectives~\cite{li2020qffl}.
+\end{itemize}
+Heterogeneity is usually induced with a Dirichlet split over class labels~\cite{hsu2019dirichlet}. Regression on
+smart-meter data has no class labels, so we use a Dirichlet split over load-profile clusters and also measure the
+resulting heterogeneity directly.
+
+Choosing the proximal coefficient remains ad hoc. The FedProx paper adapts $\mu$ from the training
+loss~\cite{li2020fedprox}. HAPI-FedProx adapts the proximal term from a local-versus-global performance
+index~\cite{mhou2025hapi}. Yu et al.~\cite{yu2025pflminimax} characterise the optimal regularisation strength as a
+function of heterogeneity in theory. FedAdp~\cite{wu2021fedadp} uses the geometry of client updates to set
+aggregation weights. The update-disagreement ratio used by HA-FedProx is a bounded, update-space estimate of
+FedProx's $B$-dissimilarity, and it belongs to the same family as gradient diversity~\cite{yin2018diversity}. To our
+knowledge it has not been used to schedule $\mu$, and its behaviour on real energy data has not been examined.
+
+\subsection{Privacy}
+FL keeps raw data local, but updates can leak training data through gradient inversion~\cite{zhu2019leakage,
+geiping2020inverting}. We therefore claim data locality only, not formal privacy.

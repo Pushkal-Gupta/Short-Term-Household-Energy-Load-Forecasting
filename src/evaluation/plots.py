@@ -24,7 +24,7 @@ INK, MUTED, GRID = "#0b0b0b", "#52514e", "#e4e3df"
 
 def style():
     plt.rcParams.update({
-        "figure.dpi": 150, "savefig.dpi": 200, "font.size": 9, "axes.titlesize": 10,
+        "figure.dpi": 150, "savefig.dpi": 300, "font.size": 9, "axes.titlesize": 10,
         "axes.edgecolor": MUTED, "axes.labelcolor": INK, "xtick.color": MUTED, "ytick.color": MUTED,
         "axes.grid": True, "grid.color": GRID, "grid.linewidth": 0.6, "axes.spines.top": False,
         "axes.spines.right": False, "lines.linewidth": 1.8, "legend.frameon": False,
@@ -179,5 +179,44 @@ def benefit_distribution(benefits: dict, path: Path, tag=None):
     ax.set_xlabel("Federation benefit per household: MAE_local − MAE_fed (kWh)")
     ax.set_ylabel("Share of households (CDF)")
     ax.set_title("Left of zero = household is worse off than training alone", loc="left")
+    _legend_right(ax)
+    _save(fig, path, tag)
+
+
+def rho_vs_round(curves: dict, path: Path, tag=None):
+    """curves: label -> DataFrame with round, update_disagreement_rho_mean/_std (FedAvg runs)."""
+    style()
+    fig, ax = plt.subplots(figsize=(6.2, 3.4))
+    shades = ["#f6b48a", "#eb6834", "#b8461c", "#6e2508", "#2a78d6"]
+    for (label, df), c in zip(curves.items(), shades):
+        m = df["update_disagreement_rho_mean"].to_numpy()
+        s = df["update_disagreement_rho_std"].fillna(0).to_numpy()
+        ax.plot(df["round"], m, color=c, label=label)
+        ax.fill_between(df["round"], m - s, m + s, color=c, alpha=0.12, lw=0)
+    _rounds_axis(ax)
+    ax.set_ylim(0, 1.02)
+    ax.set_ylabel("Update disagreement ρ_t")
+    ax.set_title("ρ_t follows training progress, not the partition", loc="left")
+    _legend_right(ax)
+    _save(fig, path, tag)
+
+
+def fragmentation(df: pd.DataFrame, path: Path, refs: dict, tag=None):
+    """df rows: K, test_mae_mean, test_mae_std, ft_mae_mean (FedAvg, random grouping / household clients)."""
+    style()
+    fig, ax = plt.subplots(figsize=(6.2, 3.6))
+    df = df.sort_values("K")
+    ax.errorbar(df["K"], df["test_mae_mean"], yerr=df["test_mae_std"].fillna(0), color=COLORS["fedavg"],
+                marker="o", ms=5, capsize=2, label="FedAvg (global model)")
+    if "ft_mae_mean" in df and df["ft_mae_mean"].notna().any():
+        ax.plot(df["K"], df["ft_mae_mean"], color=COLORS["finetuned"], marker="s", ms=4, ls="--",
+                label="FedAvg + 1-epoch local FT")
+    for label, (alg, val) in refs.items():
+        ax.axhline(val, color=COLORS[alg], lw=1.0, ls=":", label=label)
+    ax.set_xscale("log")
+    ax.set_xticks(df["K"], [str(int(k)) for k in df["K"]])
+    ax.set_xlabel("Number of clients K holding the same 100 homes (log scale)")
+    ax.set_ylabel("Test MAE (kWh / half-hour)")
+    ax.set_title("Cost of fragmenting the same data", loc="left")
     _legend_right(ax)
     _save(fig, path, tag)

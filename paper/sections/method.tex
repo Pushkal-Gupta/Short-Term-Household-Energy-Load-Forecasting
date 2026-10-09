@@ -1,0 +1,109 @@
+\section{Methodology}\label{sec:method}
+
+\subsection{Forecasting task and model}
+Let $x_{i,t}$ be the energy (kWh) consumed by household $i$ in half-hour $t$. Each household's series is standardised
+with a mean and standard deviation estimated on its own training period only. The forecaster receives the last
+$L=48$ standardised readings (24\,h) and predicts the next half-hour,
+$\hat{x}_{i,t+1} = f_w(x_{i,t-L+1},\ldots,x_{i,t})$. All arms share one architecture: a single-layer LSTM with 64
+hidden units followed by a linear output layer ($P=\NumParams{}$ parameters, \PayloadKB{}\,kB in 32-bit floating point).
+Training minimises the mean squared error with Adam (learning rate $10^{-3}$, batch 256). Errors are reported in kWh
+after inverting each household's scaling. Keeping the model small and fixed is deliberate: the object of study is
+the training regime, not the architecture.
+
+\subsection{Arms}
+\begin{description}
+\item[Naive baselines.] Persistence ($\hat{x}_{t+1}=x_t$) and seasonal naive ($\hat{x}_{t+1}=x_{t-47}$).
+\item[Local-only.] One model per household, trained on that household's windows only, with early stopping on its
+own validation error. No data or weights leave the home.
+\item[Centralised.] One model trained on the pooled windows of all households, with early stopping on pooled
+validation error. This is the accuracy reference, and it requires the raw readings to leave the home.
+\item[FedAvg.] $K$ clients each hold the windows of one or more households. In round $t$ the server samples a set
+$S_t$ of clients, sends them the global weights $w_t$, each client trains for $E$ local epochs and returns $w_k$, and
+the server sets $w_{t+1}=\sum_{k\in S_t'} p_k w_k$ with $p_k=n_k/\sum_{j\in S_t'} n_j$, where $n_k$ is the number of
+training windows of client $k$ and $S_t'\subseteq S_t$ the clients that returned~\cite{mcmahan2017fedavg}.
+\item[FedProx.] Each client minimises $F_k(w)+\frac{\mu}{2}\lVert w-w_t\rVert^2$ and stragglers' partial updates are
+kept rather than dropped~\cite{li2020fedprox}.
+\item[HA-FedProx.] FedProx with a coefficient $\mu_t$ set by the server each round (Section~\ref{sec:ha}).
+\item[FedAvg + local fine-tuning (FT).] After federated training, each household fine-tunes the final global model
+for one epoch on its own training windows. This costs no communication and is evaluated for every federated run.
+\end{description}
+Clients are stateless: a fresh optimiser is created at every local update, as is standard for cross-device FL.
+
+\subsection{Clients and controlled partitions}\label{sec:partition}
+Two client models are considered. In \emph{household mode} each home is a client ($K=100$), which reflects
+meter-level or home-gateway deployment and has natural, uncontrolled heterogeneity. In \emph{community mode} the same
+homes are grouped into $K$ clients, which reflects a building gateway, a community energy hub or an aggregator.
+
+To dial heterogeneity with real, not invented, labels, every household is described by its normalised 24-bin mean
+daily load shape and its log mean load, both computed on the training period. These features are standardised and
+clustered with $k$-means ($k=5$, 10 restarts) into load-profile groups such as evening-peaking or flat, low or high consumption.
+Households are then assigned to clients by one of three strategies:
+(i) \emph{random}, where homes are shuffled into equal groups;
+(ii) \emph{Dirichlet}$(\alpha)$~\cite{hsu2019dirichlet}, where each client draws mixture proportions
+$\pi_k\sim\mathrm{Dir}(\alpha\mathbf{1})$ over profile clusters and fills its slots by sampling a cluster from
+$\pi_k$, renormalised to clusters with homes left; and
+(iii) \emph{cluster}, where homes are sorted by cluster and mean load and chunked, the maximally separated case.
+Because the homes, and therefore the test windows, are identical under every strategy, error differences between
+partitions are caused by the partition alone.
+
+\subsection{Measured heterogeneity index}\label{sec:hindex}
+Nominal labels such as ``$\alpha=0.3$'' do not say how different the resulting clients are. We therefore measure
+heterogeneity directly on training data. For client $k$, let $q_k\in\Delta^{167}$ be the distribution of its total
+training consumption over the 168 hours of the week. With $\mathrm{JS}$ the Jensen--Shannon divergence in
+base 2~\cite{lin1991divergence} and $m_k$ the mean load of client $k$,
+\begin{equation}
+H_{\mathrm{JS}}=\binom{K}{2}^{-1}\sum_{k<l}\mathrm{JS}(q_k\,\Vert\,q_l),\qquad
+H_{\mathrm{CV}}=\frac{\mathrm{sd}(m_k)}{\mathrm{mean}(m_k)},\qquad
+H=H_{\mathrm{JS}}+\frac{H_{\mathrm{CV}}}{1+H_{\mathrm{CV}}}.
+\end{equation}
+$H_{\mathrm{JS}}\in[0,1]$ measures differences in \emph{when} clients consume, and the bounded transform of
+$H_{\mathrm{CV}}$ measures differences in \emph{how much} they consume. $H=0$ for a single client or identical
+clients. The index uses no labels and no test data.
+
+\subsection{HA-FedProx: a heterogeneity-adaptive proximal coefficient}\label{sec:ha}
+The proximal coefficient of FedProx trades client drift against local progress. It is usually fixed by tuning,
+yet the appropriate strength should depend on how much the client updates disagree. After aggregating round $t$,
+the server holds the client updates $\Delta_k=w_k-w_t$ and their weighted mean $\bar\Delta=\sum_k p_k\Delta_k$.
+It computes the \emph{update-disagreement ratio}
+\begin{equation}\label{eq:rho}
+\rho_t=\frac{\sum_k p_k\lVert\Delta_k-\bar\Delta\rVert^2}{\sum_k p_k\lVert\Delta_k\rVert^2}\in[0,1],
+\end{equation}
+which is 0 when all clients move identically and approaches 1 when their updates cancel. By the
+bias--variance identity $\sum_k p_k\lVert\Delta_k\rVert^2=\lVert\bar\Delta\rVert^2+\sum_k p_k\lVert\Delta_k-\bar\Delta\rVert^2$,
+$\rho_t=1-1/B_t^2$ with $B_t^2=\sum_k p_k\lVert\Delta_k\rVert^2/\lVert\bar\Delta\rVert^2$, an update-space analogue of
+the $B$-local dissimilarity used in the convergence analysis of FedProx~\cite{li2020fedprox}. The next round uses
+\begin{equation}
+\mu_{t+1}=\mathrm{clip}\!\left(\mu_0\,\rho_t,\ \mu_{\min},\ \mu_{\max}\right),
+\end{equation}
+with $\mu_{\min}=10^{-4}$, $\mu_{\max}=1$ and $\mu_0$ tuned on validation data exactly as FedProx's fixed $\mu$. The
+rule needs no additional client computation or messages, and it reduces to FedAvg for $\mu_0=0$. An earlier variant
+normalised by $\lVert\bar\Delta\rVert^2$ alone; it is unbounded as the global model converges and
+$\lVert\bar\Delta\rVert\to0$, which is why the bounded ratio~\eqref{eq:rho} is used.
+
+\subsection{Partial participation and stragglers}
+In each round a fraction $C$ of clients is sampled. Each sampled client independently becomes a straggler with
+probability $p_s$ and completes only a uniform random fraction $u\sim U(0.1,1)$ of its local work. Following the
+protocol of Li et al.~\cite{li2020fedprox}, FedAvg drops stragglers (they download but never upload) while FedProx
+and HA-FedProx aggregate their partial updates.
+
+\subsection{Communication accounting}\label{sec:comm}
+A model message carries $P\cdot b$ bytes, with $b=4$ for 32-bit and $b=2$ for 16-bit updates. Round $t$ costs
+$P b(|S_t|+|S_t'|)$: one download per selected client and one upload per returning client. Protocol framing is
+excluded; the Flower backend measures it at about 1\,\% of the payload. For the centralised arm we report the volume
+of the raw training readings, at 4 bytes per value plus an 8-byte timestamp, as the bytes that pooling would move.
+Let $v_t$ be the validation MAE of the global model after round $t$ and $v^\star$ the centralised validation MAE.
+We define
+\begin{equation}
+R@\varepsilon=\min\{t: v_t\le(1+\varepsilon)v^\star\},\qquad B@\varepsilon=\sum_{s\le R@\varepsilon}P b(|S_s|+|S_s'|),
+\end{equation}
+with $\varepsilon=10\,\%$. These convert ``how close to centralised'' into ``at what network price''.
+
+\subsection{Metrics and statistics}
+We report mean absolute error (MAE), root mean squared error (RMSE), weighted absolute percentage error
+(WAPE $=100\sum|x-\hat{x}|/\sum|x|$), and MAPE restricted to half-hours with $x\ge0.05$\,kWh. Unrestricted MAPE is
+unbounded at the near-zero night-time loads that are common in households. All pooled metrics are micro-averaged
+over every test half-hour of every household. Per-household errors are averaged over seeds and compared with
+two-sided Wilcoxon signed-rank tests~\cite{wilcoxon1945} over the \NumHouseholds{} households, with Holm
+correction~\cite{holm1979} across the family of comparisons. Because $p$-values with 100 paired households can be
+small for negligible effects, every test is reported with its median paired difference and the share of households
+for which one arm is better.

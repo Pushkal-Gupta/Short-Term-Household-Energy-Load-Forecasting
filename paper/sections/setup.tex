@@ -1,0 +1,63 @@
+\section{Experimental setup}\label{sec:setup}
+
+\subsection{Data}
+We use the public release of the Low Carbon London smart-meter trial run by UK Power Networks~\cite{ukpn2015lcl}.
+It contains half-hourly consumption of 5{,}567 London households between November 2011 and February 2014. We stream
+all 168 files of the partitioned release (\RowsInPeriod{} million readings in the study year), observe
+\HouseholdsSeen{} household identifiers, and apply the following rules. The study period is calendar year 2013.
+Only standard-tariff households are kept, because the time-of-use group received dynamic price signals in 2013 that
+would confound the comparison. Unparseable, negative or implausible readings ($>10$\,kWh per half-hour) are set to
+missing, duplicate timestamps are averaged, and each series is re-indexed to a full 30-minute grid. Gaps of up to
+2\,h are linearly interpolated and longer gaps are left missing; any window that touches a missing value is dropped.
+Households with at least 95\,\% coverage in 2013 are eligible (\HouseholdsEligible{} homes). From these we draw a
+cohort of \NumHouseholds{} homes, stratified into quintiles of training-period mean load (20 per quintile) with a fixed
+selection seed. The cohort's mean training-period load is 0.206\,kWh per half-hour (range 0.008--0.972), and its mean
+coverage is 99.9\,\%.
+
+The split is chronological and identical for every household: training January--August 2013, validation
+September--October and test November--December. A window belongs to the split of its target time stamp, so its
+inputs may reach back into the previous split; those readings are known at forecast time. This yields 1{,}160{,}952
+training and 292{,}052 test windows. Scalers, load-profile clusters and the heterogeneity index are computed from
+training data only, and every decision (early stopping, best federated round, hyper-parameters) uses validation error
+only. Test error never drives a decision.
+
+\subsection{Experimental matrix}
+Table~\ref{tab:matrix} lists the experiments. Unless stated otherwise, community mode uses $K=20$ clients of five
+homes each, every client participates in every round, $E=1$ local epoch and $T=30$ rounds. Thirty rounds of one
+local epoch equal the number of passes over the data allowed to the centralised arm (30 epochs, early stopping with
+patience 4), so federated and centralised training have the same computational budget. FedProx's $\mu$ and
+HA-FedProx's $\mu_0$ were tuned on validation data from the grids $\{10^{-3},10^{-2},10^{-1}\}$ and
+$\{10^{-2},10^{-1},1\}$, under the hardest (cluster) partition and with the first seed. This selected $\mu=\TunedMuFedProx{}$
+and $\mu_0=\TunedMuHA{}$, which were then used in every other experiment. Each experiment is repeated with three
+seeds (42, 43, 44), which change model initialisation, client sampling, stragglers and the random and Dirichlet
+groupings, but not the cohort, the profile clusters or the split.
+
+\begin{table}[t]
+\centering\small
+\caption{Experimental matrix. All rows use the same 100 households, split, model and budget.}\label{tab:matrix}
+\begin{tabular}{lll}
+\toprule
+ID & Arm(s) & Factor varied \\
+\midrule
+E0 & persistence, seasonal naive & reference \\
+E1 & local-only & no collaboration \\
+E2 & centralised & pooled raw data \\
+E3 & FedAvg & random grouping, $K=20$ \\
+E4, E5 & FedAvg, FedProx & Dirichlet $\alpha=0.3$ \\
+E6, E7 & FedAvg, FedProx & cluster grouping (strong non-IID) \\
+E8, E9, E11 & FedAvg, FedProx, HA-FedProx & $\alpha=0.3$, $C=0.5$, 20\,\% stragglers \\
+E10 & FedAvg, FedProx, HA-FedProx & $\alpha\in\{\infty,1,0.3,0.1,0\}$ sweep \\
+E12 & FedAvg & $\alpha=0.3$, 16-bit updates \\
+E13 & FedAvg, FedProx, HA-FedProx & one household per client ($K=100$) \\
+E14 & FedAvg & random grouping, $K\in\{1,5,50\}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Implementation}
+The pipeline is written in Python with PyTorch. The federated loop is a deterministic in-process simulator whose
+clients implement the Flower \texttt{NumPyClient} interface. An optional backend runs the same clients through
+Flower's own FedAvg and FedProx strategies~\cite{beutel2020flower}, and on a test configuration it reproduces the
+simulator's per-round validation error and final test error exactly. Experiments ran on a single Apple M5 Max
+workstation (Metal backend), eight runs in parallel. Code, configuration files and every result table are available
+in the accompanying repository (Section~\ref{sec:data}).

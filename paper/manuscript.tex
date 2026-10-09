@@ -1,35 +1,45 @@
-% Manuscript draft. Compile:  cd paper && tectonic manuscript.tex   (or pdflatex+bibtex)
-% Every number in the Results section is taken from generated/numbers.tex and generated/table_*.tex,
-% which are written by `python -m src.experiments.make_report` from the real-data runs.
-\documentclass[11pt]{article}
-\usepackage[margin=1in]{geometry}
+% Manuscript for submission to Applied Energy (Elsevier). Compile:  cd paper && tectonic manuscript.tex
+% Every number in Sections 5-6 comes from generated/numbers.tex and generated/table_*.tex, which
+% `python -m src.experiments.make_report` writes from the real-data runs. Do not type numbers by hand.
+\documentclass[preprint,12pt]{elsarticle}
 \usepackage{amsmath,amssymb}
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{float}
 \usepackage[hidelinks]{hyperref}
 \usepackage{xurl}
-\usepackage[numbers,sort&compress]{natbib}
-\usepackage{caption}
-\captionsetup{font=small}
+\usepackage{lineno}
+\usepackage[font=small]{caption}
 \graphicspath{{figures/}}
 \input{generated/numbers.tex}
-
-\title{Measuring What Heterogeneity Costs: A Controlled, Communication-Priced Study of Federated LSTM Forecasting on London Smart Meters, with a Heterogeneity-Adaptive Proximal Rule}
-\author{Pushkal Gupta \and Kaushik Vanka\\[2pt]\small School of Computer Science and Engineering, Vellore Institute of Technology}
-\date{Draft --- \today}
+\newcommand{\ie}{i.e.,\ }
+\newcommand{\eg}{e.g.,\ }
+\journal{Applied Energy}
 
 \begin{document}
-\maketitle
+\begin{frontmatter}
 
-\begin{abstract}
-%ABSTRACT%
-\end{abstract}
+\title{What does heterogeneity cost? A controlled, communication-priced decomposition of federated LSTM load forecasting on London smart meters}
 
-\noindent\textbf{Keywords:} federated learning; short-term load forecasting; smart meters; LSTM; non-IID data; FedProx; communication cost; energy equity.
+\author[vit]{Pushkal Gupta\corref{cor}}
+\ead{pushkalgupta2005@gmail.com}
+\author[vit]{Kaushik Vanka}
+\cortext[cor]{Corresponding author.}
+\affiliation[vit]{organization={School of Computer Science and Engineering, Vellore Institute of Technology},
+            city={Vellore}, postcode={632014}, state={Tamil Nadu}, country={India}}
 
-%BODY%
+\input{sections/abstract.tex}
 
-\bibliographystyle{unsrtnat}
+\begin{keyword}
+federated learning \sep short-term load forecasting \sep smart meters \sep non-IID data \sep communication cost \sep energy equity
+\end{keyword}
+
+\end{frontmatter}
+
+\linenumbers
+
+\input{sections/body.tex}
+
+\bibliographystyle{elsarticle-num}
 \bibliography{refs}
 \end{document}
