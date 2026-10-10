@@ -9,6 +9,8 @@ same `elsarticle` format and also publishes federated-learning work for energy.
 | File | Use in Editorial Manager |
 |---|---|
 | `manuscript.pdf` | Manuscript (initial submission accepts a single PDF) |
+| `manuscript_template.docx` / `.pdf` | The same study in the IMRaD Word journal template, 11 pages (32 references, 4 tables, 4 figures). Rebuild with `make docx` |
+| `manuscript_template_long.docx` / `.pdf` | Full-length Word version (21 pages), for journals without a page limit |
 | `cover_letter.pdf` | Cover letter |
 | `highlights.txt` | Highlights: 5 bullets, each ≤ 85 characters |
 | `graphical_abstract.png` | Graphical abstract (3966 × 1665 px; minimum 1328 × 531) |
@@ -23,6 +25,8 @@ same `elsarticle` format and also publishes federated-learning work for energy.
 - [ ] **Each author revises parts of the text in their own words**, especially the Introduction and Discussion.
       This is the most reliable way to make the paper read as the authors' own work.
 - [ ] Confirm the **affiliation** wording for all authors.
+- [ ] ORCID of the corresponding author: 0009-0004-7032-6847 (in the Word version; enter it in Editorial Manager too).
+- [ ] Word version: set the journal name in the page header (currently "Manuscript for review").
 - [ ] Confirm the **CRediT statement** in `paper/sections/declarations.tex`.
 - [ ] Confirm **funding** ("no specific grant") and **competing interests** ("none").
 - [ ] Review the **generative-AI declaration** (Elsevier policy). It states that Claude (Anthropic) was used

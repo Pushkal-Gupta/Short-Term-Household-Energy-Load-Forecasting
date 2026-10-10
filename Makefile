@@ -1,7 +1,7 @@
 PY ?= .venv/bin/python
 WORKERS ?= 8
 
-.PHONY: help venv install flower clean test demo data preprocess baselines fedavg fedprox matrix report paper
+.PHONY: help venv install flower clean test demo data preprocess baselines fedavg fedprox matrix report paper docx
 
 help:
 	@echo "make venv        - create .venv and install every dependency "
@@ -16,6 +16,7 @@ help:
 	@echo "make matrix      - full experiment matrix, 3 seeds, WORKERS=$(WORKERS) in parallel"
 	@echo "make report      - tables, statistics, plots, paper/generated/*.tex"
 	@echo "make paper       - compile paper/manuscript.pdf (needs tectonic or pdflatex)"
+	@echo "make docx        - Word versions in the IMRaD journal template (11-page and full-length)"
 	@echo "make clean       - remove caches"
 
 venv:
@@ -57,6 +58,11 @@ report:
 
 paper:
 	cd paper && (command -v tectonic >/dev/null && tectonic manuscript.tex || (pdflatex manuscript && bibtex manuscript && pdflatex manuscript && pdflatex manuscript))
+
+docx:
+	$(PY) paper/docx/workflow_figure.py
+	$(PY) paper/docx/build_docx.py
+	$(PY) paper/docx/build_docx.py --long
 
 clean:
 	rm -rf __pycache__ src/__pycache__ .pytest_cache
