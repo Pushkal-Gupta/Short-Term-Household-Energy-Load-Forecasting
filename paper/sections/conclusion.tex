@@ -3,16 +3,13 @@
 We studied federated LSTM forecasting of household load under a protocol that holds the data, model and budget fixed
 and changes one factor at a time, on 100 London homes from the Low Carbon London trial.
 
-Three conclusions follow.
-\begin{itemize}
-\item \emph{The federated accuracy gap is a fragmentation cost.} The federated protocol on one client matches
-centralised training. The error then grows with the number of clients the same homes are spread over, to about
-10\,\% when every home is a client.
-\item \emph{Heterogeneity is mainly a communication cost.} Grouping homes from random to fully profile-clustered
-barely moved final accuracy, but raised the bytes needed to approach centralised accuracy by about 85\,\%.
-\item \emph{FL is not the bandwidth-light option.} With a small LSTM and half-hourly data, federated training moves
-more bytes than the readings it protects, so its justification is governance.
-\end{itemize}
+Three conclusions follow. First, the federated accuracy gap is a fragmentation cost: the federated protocol on a
+single client matches centralised training, and the error grows with the number of clients the same homes are spread
+over, to about 10\,\% when every home is its own client. Second, heterogeneity is mainly a communication cost.
+Regrouping homes from random to fully profile-clustered barely moved final accuracy but raised the bytes needed to
+approach centralised accuracy by about 85\,\%. Third, FL is not the bandwidth-light option here. With a small LSTM and
+half-hourly data, federated training moves more bytes than the readings it protects, so its justification is
+governance.
 
 For practitioners, this suggests federating a few aggregated clients rather than individual meters, fine-tuning the
 global model locally (which removed most of the harm to individual households at community scale), and selecting the

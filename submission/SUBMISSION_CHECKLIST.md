@@ -17,8 +17,11 @@ same `elsarticle` format and also publishes federated-learning work for energy.
 
 ## Before you press Submit (only the authors can do these)
 
-- [ ] **All three authors approve** the manuscript and author order. Dr. Kalaavathi B in particular must agree
-      to be listed, and to her CRediT roles (Supervision, Methodology, Writing – review & editing).
+- [x] Dr. Kalaavathi B has agreed to be listed as an author (confirmed by the corresponding author, 2026-10-10).
+- [ ] **All three authors read and approve** the final manuscript, the author order and the CRediT roles
+      (Kalaavathi B: Supervision, Methodology, Writing – review & editing).
+- [ ] **Each author revises parts of the text in their own words**, especially the Introduction and Discussion.
+      This is the most reliable way to make the paper read as the authors' own work.
 - [ ] Confirm the **affiliation** wording for all authors.
 - [ ] Confirm the **CRediT statement** in `paper/sections/declarations.tex`.
 - [ ] Confirm **funding** ("no specific grant") and **competing interests** ("none").
@@ -28,6 +31,9 @@ same `elsarticle` format and also publishes federated-learning work for energy.
       replace the placeholder in the *Data and code availability* section.
 - [ ] Read the journal's current Guide for Authors once more. Check word count (about 8,000 for research articles; the body is about 6,000 words now),
       abstract length (198 words) and keywords (6).
+- [ ] Run the PDF through your institution's Turnitin/iThenticate **similarity** check. The text is original and
+      every borrowed claim is cited, so the score should be low. Remaining matches will mostly be the reference list
+      and standard phrases. Keep the generative-AI declaration: Elsevier requires it, and it covers the use of AI tools.
 - [ ] Optionally add **suggested reviewers**. Do not suggest anyone with a conflict of interest.
 - [ ] Recompile after any edit: `cd paper && tectonic manuscript.tex`, then copy the PDF here.
 

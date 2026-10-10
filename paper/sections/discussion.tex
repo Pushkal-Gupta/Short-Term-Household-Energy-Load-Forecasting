@@ -18,30 +18,30 @@ coefficient was close to zero, and the adaptive variant performed worse. When fr
 heterogeneous clients, causes most of the gap, a drift penalty has little to correct and mainly slows local progress.
 
 \subsection{Implications for deployment}
-\begin{itemize}
-\item \emph{Federate few, large clients.} The single most consequential design choice was the number of clients
-the data were spread over. Aggregating homes behind a building gateway, a community energy hub or a supplier-side
-aggregator and federating those (here $K=5$) cost \EonefourfedavgKfiveGap{}\,\% in MAE relative to centralised training, with a quarter
-of the traffic of 20 clients (\EonefourfedavgKfiveMB{}\,MB), whereas meter-level federation ($K=100$) lost \EonethreefedavghouseholdGap{}\,\% and
-moved about 30 times the raw data. Where governance permits an intermediate tier, it is the cheapest accuracy lever
-available.
-\item \emph{Federation is a governance choice, not a bandwidth saving, at this scale.} A household's eight months of training
-half-hourly readings occupy about 140\,kB, only about twice the size of a single message of this small LSTM. Thirty rounds
-of federated training therefore move several times more data than uploading the readings would, and even the
-traffic to near-centralised accuracy is of the same order as the data. The case for FL in residential forecasting
-rests on data minimisation, consent and regulatory constraints, not on network load. This agrees with the qualitative
-argument of Briggs et al.~\cite{briggs2020ccai}, and it qualifies analytic estimates of large bandwidth
+The most consequential design choice in our experiments was the number of clients the data were spread over.
+Aggregating homes behind a building gateway, a community energy hub or a supplier-side aggregator, and federating
+those ($K=5$ here), cost \EonefourfedavgKfiveGap{}\,\% in MAE relative to centralised training and needed a quarter of
+the traffic of 20 clients (\EonefourfedavgKfiveMB{}\,MB). Meter-level federation ($K=100$) lost
+\EonethreefedavghouseholdGap{}\,\% and moved about 30 times the raw data. Where governance allows an intermediate
+tier, it is the cheapest accuracy lever available.
+
+At this scale, federation is a governance choice rather than a bandwidth saving. Eight months of half-hourly training
+readings from one household occupy about 140\,kB, roughly twice a single message of our small LSTM. Thirty rounds of
+federated training therefore move several times more data than uploading the readings would, and even the traffic
+needed to reach near-centralised accuracy is of the same order as the data. The case for FL in residential
+forecasting rests on data minimisation, consent and regulation, not on network load. This agrees with the
+qualitative argument of Briggs et al.~\cite{briggs2020ccai} and qualifies the analytic estimates of large
 savings~\cite{taik2020,savi2021}, which depend on model size, sampling rate and the number of rounds.
-\item \emph{Fine-tune locally after federating.} One epoch of local fine-tuning costs no communication. It closed
-much of the gap between FedAvg and local training per household, and it reduced the share of homes harmed by
-federation from around two thirds to below one half. Any federated household forecaster should ship with this step.
-\item \emph{Select the round on validation error.} Validation error rose temporarily in early rounds in every
-federated configuration. A fixed, short round budget can therefore deliver a worse model than a longer budget with
-validation-based selection.
-\item \emph{Watch the high-consumption tail.} The homes that gain most from pooled data are the highest consumers,
-and they are also the ones FedAvg serves worst. A distribution system operator using federated forecasts for
-congestion management should evaluate errors per consumption tier, not only on average.
-\end{itemize}
+
+Two further steps are cheap and worth taking. One epoch of local fine-tuning costs no communication, closed much of
+the per-household gap between FedAvg and local training, and cut the share of homes harmed by federation from about
+two thirds to under one half; we would not deploy a federated household forecaster without it. The round should also
+be chosen on validation error. Validation error rose for a while in the early rounds of every federated
+configuration, so a short fixed budget can deliver a worse model than a longer one with validation-based selection.
+
+Finally, operators should look at the high-consumption tail. The homes that gain most from pooled data are the
+largest consumers, and they are also the ones FedAvg serves worst. A distribution system operator using federated
+forecasts for congestion management should therefore evaluate errors per consumption tier and not only on average.
 
 \subsection{On adaptive proximal coefficients}
 HA-FedProx was designed on the premise that the dispersion of client updates measures heterogeneity. The premise is
@@ -56,18 +56,17 @@ FedProx's $B$-dissimilarity) confound heterogeneity with the stage of optimisati
 regularisation to them should be checked against this confound.
 
 \subsection{Limitations}
-\begin{itemize}
-\item \emph{Scope.} One dataset, one city, one study year and one horizon: a winter test period and a 30-minute
-horizon for 100 standard-tariff London homes. The conclusions concern a small LSTM. Larger models raise
-per-message traffic proportionally, which strengthens the communication conclusion but may change the accuracy
-results.
-\item \emph{Simulated network and privacy.} The network and stragglers are simulated, and traffic counts payload
-bytes only; protocol overhead was measured at about 1\,\%. Keeping data local is not a formal privacy guarantee.
-Updates can leak information~\cite{zhu2019leakage,geiping2020inverting}, and neither differential privacy nor secure
-aggregation was applied. Both would add accuracy or communication costs on top of those measured here.
-\item \emph{Fixed hyper-parameters.} The learning rate, model size and window were fixed a priori and shared by all
-arms. Only the proximal coefficients were tuned. A per-arm search could move individual numbers, although the
-controlled comparison is designed to make such shifts affect all arms alike.
-\item \emph{Server-side evaluation.} For efficiency the simulator scores the global model on every household's
-validation and test windows. A deployment would compute these scores on the clients and report only the metrics.
-\end{itemize}
+The study covers one dataset, one city, one year and one horizon: a winter test period and 30-minute-ahead forecasts
+for 100 standard-tariff London homes. Its conclusions concern a small LSTM. Larger models raise per-message traffic in
+proportion, which would strengthen the communication finding but might change the accuracy results.
+
+The network and the stragglers are simulated, and traffic counts payload bytes only (protocol overhead was measured
+at about 1\,\%). Keeping data local is not a formal privacy guarantee: updates can leak
+information~\cite{zhu2019leakage,geiping2020inverting}, and we applied neither differential privacy nor secure
+aggregation. Both would add accuracy or communication costs on top of those reported here.
+
+The learning rate, model size and input window were fixed in advance and shared by all arms; only the proximal
+coefficients were tuned. A per-arm search could move individual numbers, although the controlled design should make
+such shifts affect all arms alike. Lastly, for efficiency the simulator scores the global model on every household's
+validation and test windows centrally. In a deployment the clients would compute these scores and report only the
+metrics.
