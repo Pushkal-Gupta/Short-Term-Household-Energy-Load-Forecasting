@@ -1,0 +1,52 @@
+# Revision experiments (answers to the internal review). Run with:
+#   python -m src.experiments.run_matrix --matrix configs/matrix_revision.yaml --phase main --workers 8
+# Entries may carry their own `seeds`; otherwise the default seeds (42, 43, 44) are used.
+# Long runs come first so that the parallel pool finishes evenly.
+main:
+  # ---- R1: training budget. Run the fragmented settings to a plateau (100 rounds, stop after 25
+  #      rounds without a new best validation MAE). ----
+  - {name: E18_fedavg_K100_long, method: federated, set: {fed.algorithm: fedavg, partition.mode: household, fed.rounds: 100, fed.patience_rounds: 25}}
+  - {name: E18_fedavg_K50_long,  method: federated, set: {fed.algorithm: fedavg, partition.strategy: iid, partition.households_per_client: 2, fed.rounds: 100, fed.patience_rounds: 25}}
+  - {name: E18_fedavg_K20_long,  method: federated, set: {fed.algorithm: fedavg, partition.strategy: iid, fed.rounds: 100, fed.patience_rounds: 25}}
+  # ---- R2: IID control. Windows (not homes) dealt at random to K clients: fragmentation without heterogeneity ----
+  - {name: E15_fedavg_window_K100, method: federated, set: {fed.algorithm: fedavg, partition.strategy: window_iid, partition.households_per_client: 1}}
+  - {name: E15_fedavg_window_K50,  method: federated, set: {fed.algorithm: fedavg, partition.strategy: window_iid, partition.households_per_client: 2}}
+  - {name: E15_fedavg_window_K20,  method: federated, set: {fed.algorithm: fedavg, partition.strategy: window_iid, partition.households_per_client: 5}}
+  - {name: E15_fedavg_window_K5,   method: federated, set: {fed.algorithm: fedavg, partition.strategy: window_iid, partition.households_per_client: 20}}
+  # ---- R6a: stronger inputs. Calendar channels (sin/cos time of day and day of week) ----
+  - {name: E19_fedavg_K100_cal,   method: federated,   set: {fed.algorithm: fedavg, partition.mode: household, window.calendar_features: true}}
+  - {name: E19_fedavg_K20_cal,    method: federated,   set: {fed.algorithm: fedavg, partition.strategy: iid, window.calendar_features: true}}
+  - {name: E19_centralized_cal,   method: centralized, set: {window.calendar_features: true}}
+  - {name: E19_local_cal,         method: local,       set: {window.calendar_features: true}}
+  # ---- R6b: two more cohorts of 100 homes (different selection seeds), seeds 42 and 43 ----
+  - {name: C43_fedavg_K100, method: federated, seeds: [42, 43], set: {data.selection_seed: 43, data.processed_dir: data/processed/cohort43, fed.algorithm: fedavg, partition.mode: household}}
+  - {name: C44_fedavg_K100, method: federated, seeds: [42, 43], set: {data.selection_seed: 44, data.processed_dir: data/processed/cohort44, fed.algorithm: fedavg, partition.mode: household}}
+  - {name: C43_fedavg_K20,  method: federated, seeds: [42, 43], set: {data.selection_seed: 43, data.processed_dir: data/processed/cohort43, fed.algorithm: fedavg, partition.strategy: iid}}
+  - {name: C44_fedavg_K20,  method: federated, seeds: [42, 43], set: {data.selection_seed: 44, data.processed_dir: data/processed/cohort44, fed.algorithm: fedavg, partition.strategy: iid}}
+  - {name: C43_fedavg_K5,   method: federated, seeds: [42, 43], set: {data.selection_seed: 43, data.processed_dir: data/processed/cohort43, fed.algorithm: fedavg, partition.strategy: iid, partition.households_per_client: 20}}
+  - {name: C44_fedavg_K5,   method: federated, seeds: [42, 43], set: {data.selection_seed: 44, data.processed_dir: data/processed/cohort44, fed.algorithm: fedavg, partition.strategy: iid, partition.households_per_client: 20}}
+  - {name: C43_fedavg_K1,   method: federated, seeds: [42, 43], set: {data.selection_seed: 43, data.processed_dir: data/processed/cohort43, fed.algorithm: fedavg, partition.strategy: iid, partition.households_per_client: 100}}
+  - {name: C44_fedavg_K1,   method: federated, seeds: [42, 43], set: {data.selection_seed: 44, data.processed_dir: data/processed/cohort44, fed.algorithm: fedavg, partition.strategy: iid, partition.households_per_client: 100}}
+  - {name: C43_centralized, method: centralized, seeds: [42, 43], set: {data.selection_seed: 43, data.processed_dir: data/processed/cohort43}}
+  - {name: C44_centralized, method: centralized, seeds: [42, 43], set: {data.selection_seed: 44, data.processed_dir: data/processed/cohort44}}
+  - {name: C43_local,       method: local,       seeds: [42, 43], set: {data.selection_seed: 43, data.processed_dir: data/processed/cohort43}}
+  - {name: C44_local,       method: local,       seeds: [42, 43], set: {data.selection_seed: 44, data.processed_dir: data/processed/cohort44}}
+  # ---- R4: two more seeds (45, 46) for the FedAvg heterogeneity sweep and the fp16 / partial-participation runs.
+  #      Settings identical to configs/matrix.yaml. ----
+  - {name: E3_fedavg_iid,            method: federated, seeds: [45, 46], set: {fed.algorithm: fedavg, partition.strategy: iid}}
+  - {name: E4_fedavg_moderate,       method: federated, seeds: [45, 46], set: {fed.algorithm: fedavg, partition.strategy: dirichlet, partition.alpha: 0.3}}
+  - {name: E6_fedavg_strong,         method: federated, seeds: [45, 46], set: {fed.algorithm: fedavg, partition.strategy: cluster}}
+  - {name: E10_fedavg_a1.0,          method: federated, seeds: [45, 46], set: {fed.algorithm: fedavg, partition.strategy: dirichlet, partition.alpha: 1.0}}
+  - {name: E10_fedavg_a0.1,          method: federated, seeds: [45, 46], set: {fed.algorithm: fedavg, partition.strategy: dirichlet, partition.alpha: 0.1}}
+  - {name: E8_fedavg_partial,        method: federated, seeds: [45, 46], set: {fed.algorithm: fedavg, partition.strategy: dirichlet, partition.alpha: 0.3, fed.client_fraction: 0.5, fed.straggler_prob: 0.2}}
+  - {name: E12_fedavg_fp16_moderate, method: federated, seeds: [45, 46], set: {fed.algorithm: fedavg, fed.update_precision: float16, partition.strategy: dirichlet, partition.alpha: 0.3}}
+  # ---- R3: widest load-shape heterogeneity at K = 20 (homes sorted by hour-of-week shape) ----
+  - {name: E16_fedavg_shape, method: federated, seeds: [42, 43, 44, 45, 46], set: {fed.algorithm: fedavg, partition.strategy: shape}}
+  # ---- R5: client-only baseline (each client trains alone on the homes it pools) ----
+  - {name: E17_clientlocal_K5,  method: clientlocal, set: {partition.strategy: iid, partition.households_per_client: 20}}
+  - {name: E17_clientlocal_K20, method: clientlocal, set: {partition.strategy: iid, partition.households_per_client: 5}}
+  # ---- R7: proximal coefficient grid extended down to 0 (validation only, first seed, cluster partition) ----
+  - {name: T2_fedprox_mu0,         method: federated, seeds: [42], set: {fed.algorithm: fedprox,   fed.mu: 0.0,    partition.strategy: cluster}}
+  - {name: T2_fedprox_mu0.0001,    method: federated, seeds: [42], set: {fed.algorithm: fedprox,   fed.mu: 0.0001, partition.strategy: cluster}}
+  - {name: T2_hafedprox_mu0.001,   method: federated, seeds: [42], set: {fed.algorithm: hafedprox, fed.mu: 0.001,  partition.strategy: cluster}}
+  - {name: T2_hafedprox_mu0.0001,  method: federated, seeds: [42], set: {fed.algorithm: hafedprox, fed.mu: 0.0001, partition.strategy: cluster}}

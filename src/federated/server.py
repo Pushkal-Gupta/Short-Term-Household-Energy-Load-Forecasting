@@ -61,6 +61,8 @@ class FederatedServer:
         global_w = get_weights(self.model)
         best = {"val_mae": float("inf"), "round": 0, "weights": copy.deepcopy(global_w)}
         history = []
+        patience = f.get("patience_rounds")            # optional: stop after this many rounds without a
+        patience = int(patience) if patience else None  # new best validation MAE (long-budget runs)
         for rnd in range(1, int(f["rounds"]) + 1):
             selected = sorted(self.rng.choice(K, size=n_sel, replace=False).tolist())
             is_straggler = self.rng.random(n_sel) < float(f.get("straggler_prob", 0.0))
@@ -97,6 +99,8 @@ class FederatedServer:
             if val["mae"] < best["val_mae"]:
                 best = {"val_mae": val["mae"], "round": rnd, "weights": copy.deepcopy(global_w),
                         "cumulative_bytes": comm["cumulative_bytes"]}
+            if patience and rnd - best["round"] >= patience:
+                break
             if self.verbose:
                 print(f"[{self.algorithm}] round {rnd:3d}  clients {len(results)}/{len(selected)}  "
                       f"mu {mu_t:.4g}  rho {dissim:.3f}  val_mae {val['mae']:.4f}  "

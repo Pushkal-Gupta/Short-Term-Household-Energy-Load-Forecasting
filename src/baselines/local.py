@@ -9,8 +9,31 @@ import numpy as np
 import torch
 
 from src.centralized.train import fit_early_stopping
+from src.data.window import stack
 from src.evaluation.evaluate import predict_households
 from src.models.lstm import build_model
+
+
+def run_client_local(households, groups, cfg, device, seed: int, verbose: bool = True):
+    """Client-only baseline: each client trains one model on its own pooled homes, without federation.
+
+    This is what a community hub or aggregator could do alone with the homes it already pools.
+    Same model, optimiser and early stopping (on the client's own validation windows) as local-only.
+    """
+    pairs = [None] * len(households)
+    histories = []
+    for c, g in enumerate(groups):
+        members = [households[j] for j in g]
+        torch.manual_seed(seed + 1000 + c)
+        model = build_model(cfg).to(device)
+        rng = np.random.default_rng(seed + 1000 + c)
+        hist = fit_early_stopping(model, stack(members, "train"), members, device, cfg, rng)
+        histories.append(hist)
+        for j in g:
+            pairs[j] = predict_households(model, [households[j]], "test", device)
+        if verbose:
+            print(f"[client-local] client {c + 1}/{len(groups)}  epochs {len(hist)}")
+    return [p for ps in pairs for p in ps], histories
 
 
 def run_local(households, cfg, device, seed: int, verbose: bool = True):

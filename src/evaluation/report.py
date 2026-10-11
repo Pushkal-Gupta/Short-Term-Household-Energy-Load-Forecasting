@@ -115,7 +115,7 @@ def build_report(cfg: dict, write_paper: bool | None = None) -> dict:
     mdir = results_path(cfg, "metrics", "x").parent
     pdir = results_path(cfg, "plots", "x").parent
     runs.to_csv(mdir / "runs_all.csv", index=False)
-    main = runs[~runs["experiment"].str.startswith(("T_", "t_", "probe", "flower", "sim_"))]
+    main = runs[~runs["experiment"].str.startswith(("T_", "T2_", "t_", "probe", "flower", "sim_", "C43_", "C44_", "E15_", "E16_", "E17_", "E18_", "E19_"))]
     S = summary_table(main)
     eps = float(cfg["eval"].get("epsilon_pct", 10.0))
 

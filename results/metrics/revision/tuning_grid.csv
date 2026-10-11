@@ -1,0 +1,12 @@
+algorithm,mu,val_mae,run
+fedavg (mu=0),0.0,0.07237577927986558,E6_fedavg_strong
+fedprox,0.0,0.07237577927986558,T2_fedprox_mu0
+fedprox,0.0001,0.07259937751630964,T2_fedprox_mu0.0001
+fedprox,0.001,0.07258593022721796,T_fedprox_mu0.001
+fedprox,0.01,0.07319643766913948,T_fedprox_mu0.01
+fedprox,0.1,0.07665556076189384,T_fedprox_mu0.1
+hafedprox,0.0001,0.07259937751630964,T2_hafedprox_mu0.0001
+hafedprox,0.001,0.07268443508249907,T2_hafedprox_mu0.001
+hafedprox,0.01,0.07331729458042105,T_hafedprox_mu0.01
+hafedprox,0.1,0.07681736723912812,T_hafedprox_mu0.1
+hafedprox,1.0,0.07803199524021136,T_hafedprox_mu1.0

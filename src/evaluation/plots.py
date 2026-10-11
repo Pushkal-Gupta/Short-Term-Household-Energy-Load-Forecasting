@@ -40,7 +40,16 @@ def _rounds_axis(ax):
     ax.set_xlabel("Communication round")
 
 
-def _save(fig, path: Path, tag: str | None):
+def _strip_titles(fig):
+    """Paper figures carry no titles: the caption says what is plotted. Panel letters are kept."""
+    for ax in fig.axes:
+        t = ax.get_title(loc="left")
+        ax.set_title(t[:3] if t.startswith("(") else "", loc="left")
+
+
+def _save(fig, path: Path, tag: str | None, keep_titles: bool = False):
+    if not keep_titles:
+        _strip_titles(fig)
     if tag and "synthetic" in tag.lower():
         fig.text(0.99, 0.01, "SYNTHETIC DEMO DATA — NOT A RESULT", ha="right", va="bottom",
                  color="#e34948", fontsize=8, weight="bold")
@@ -194,7 +203,10 @@ def benefit_distribution(benefits: dict, path: Path, tag=None):
     ax.axvline(0, color=MUTED, lw=0.8)
     ax.set_xlabel("Federation benefit per household: MAE_local − MAE_fed (kWh)")
     ax.set_ylabel("Share of households (CDF)")
-    ax.set_title("Left of zero = household is worse off than training alone", loc="left")
+    allb = np.concatenate([b for _, b in benefits.values()])
+    lo, hi = np.percentile(allb, [2, 98])
+    span = max(abs(lo), abs(hi))
+    ax.set_xlim(-span, span)                       # zoom on the bulk of households around zero
     _legend_right(ax)
     _save(fig, path, tag)
 
@@ -272,4 +284,4 @@ def graphical_abstract(rows: list, beps: dict, local_gap: float, path: Path):
     ax2.set_ylim(0, max(beps.values()) * 1.18)
     ax2.set_title("Bandwidth (K = 20): heterogeneity raises the bytes\nneeded to come within 10 % of centralised",
                   loc="left", fontsize=11)
-    _save(fig, path, None)
+    _save(fig, path, None, keep_titles=True)

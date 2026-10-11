@@ -41,6 +41,18 @@ same `elsarticle` format and also publishes federated-learning work for energy.
 - [ ] Optionally add **suggested reviewers**. Do not suggest anyone with a conflict of interest.
 - [ ] Recompile after any edit: `cd paper && tectonic manuscript.tex`, then copy the PDF here.
 
+## Internal review revision (2026-10-11)
+
+- [x] 86 revision runs (`configs/matrix_revision.yaml`): IID window control, 100-round budget, shape grouping,
+      client-only baseline, calendar inputs, proximal grid down to μ = 0, extra seeds, two more cohorts.
+- [x] Revised Word manuscript, 12 pages: `manuscript_template.docx` / `.pdf`. New title: "Fragmentation outweighs
+      heterogeneity in the accuracy cost of federated household load forecasting".
+- [x] Supplementary material, 5 pages: `supplementary_material.docx` / `.pdf`.
+- [x] Point-by-point response to all 35 comments: `response_to_review.docx` / `.pdf`.
+- [ ] Make https://github.com/Pushkal-Gupta/Short-Term-Household-Energy-Load-Forecasting public (cited in Data availability).
+- [ ] `manuscript_template_long.*`, `manuscript.pdf` (LaTeX) and the cover letter, highlights and graphical abstract
+      predate the revision and still carry the old claims. Bring them in line before using any of them.
+
 ## Editorial Manager steps
 
 1. Create or log in to an Elsevier account as the corresponding author (pushkal.gupta2023@vitstudent.ac.in).
@@ -60,5 +72,5 @@ same `elsarticle` format and also publishes federated-learning work for energy.
 | Incremental ML novelty | The contribution is a controlled decomposition plus negative results, not a new model. It is framed against prior LCL work (Briggs et al. 2022) and adaptive-μ work (FedProx, HAPI-FedProx). |
 | Missing energy-system relevance | Deployment implications for DSOs, aggregators and community hubs: client tier, bandwidth, consumption-tier equity. |
 | Unsupported claims | Every number in the text is a macro generated from the result files; each claim is tied to a table or test. |
-| Single dataset | Stated as a limitation. A second dataset would strengthen a revision. |
+| Single dataset | One dataset, but three independent cohorts; stated as a limitation. |
 | Reproducibility | Code, configs, per-run histories and per-household errors are included. |

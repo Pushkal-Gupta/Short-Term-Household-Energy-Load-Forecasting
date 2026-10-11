@@ -15,17 +15,17 @@ import numpy as np
 import pandas as pd
 import torch
 
-from src.baselines.local import run_local
+from src.baselines.local import run_client_local, run_local
 from src.baselines.naive import naive_pairs
 from src.centralized.train import run_centralized, train_epochs
 from src.config import base_parser, config_from_args
 from src.data.partition import partition_households
 from src.data.preprocess import DatasetNotFoundError, load_processed
-from src.data.profiles import heterogeneity_index
-from src.data.window import build_households
+from src.data.profiles import heterogeneity_from_masses, heterogeneity_index, window_shape_mass
+from src.data.window import build_households, stack
 from src.evaluation.evaluate import (evaluate_model, per_household_metrics, pooled_metrics,
                                      predict_households, predictions_frame, summarise_household_metrics)
-from src.federated.client import HouseholdClient
+from src.federated.client import HouseholdClient, WindowClient
 from src.federated.comm import raw_data_bytes
 from src.federated.server import FederatedServer
 from src.models.lstm import build_model, count_parameters, get_weights, set_weights
@@ -74,6 +74,15 @@ def run_experiment(cfg: dict, method: str, seed: int, name: str, save_prediction
         summary.update({"algorithm": "local", "rounds": 0, "total_bytes": 0,
                         "mean_epochs": float(np.mean([len(h) for h in hists]))})
         history = [{"LCLid": hd.hid, **h} for hd, hs in zip(households, hists) for h in hs]
+    elif method == "clientlocal":
+        groups, labels = partition_households(households, cfg, seed)
+        pairs, hists = run_client_local(households, groups, cfg, device, seed, verbose)
+        hidx = heterogeneity_index([[households[j] for j in g] for g in groups])
+        summary.update({"algorithm": "clientlocal", "rounds": 0, "total_bytes": 0,
+                        "num_clients": len(groups), "households_per_client": len(groups[0]),
+                        "partition_strategy": cfg["partition"]["strategy"], **hidx,
+                        "mean_epochs": float(np.mean([len(h) for h in hists]))})
+        history = [{"client": c, **h} for c, hs in enumerate(hists) for h in hs]
     elif method == "centralized":
         model, history = run_centralized(households, cfg, device, seed, verbose)
         _, _, pairs = evaluate_model(model, households, "test", device, cfg)
@@ -84,7 +93,7 @@ def run_experiment(cfg: dict, method: str, seed: int, name: str, save_prediction
         model, history, best, part = _run_federated(households, cfg, device, seed, verbose)
         _, _, pairs = evaluate_model(model, households, "test", device, cfg)
         f = cfg["fed"]
-        summary.update({"algorithm": f["algorithm"], "rounds": int(f["rounds"]), "best_round": best["round"],
+        summary.update({"algorithm": f["algorithm"], "rounds": int(f["rounds"]), "rounds_run": len(history), "best_round": best["round"],
                         "best_val_mae": best["val_mae"], "local_epochs": f["local_epochs"],
                         "client_fraction": f["client_fraction"], "mu": f.get("mu"),
                         "straggler_prob": f.get("straggler_prob", 0.0),
@@ -127,7 +136,30 @@ def run_experiment(cfg: dict, method: str, seed: int, name: str, save_prediction
     return summary
 
 
+def _window_clients(households, cfg, device, seed):
+    """IID control: deal the pooled training windows of all homes at random into K equal shards."""
+    K = len(households) // int(cfg["partition"]["households_per_client"])
+    X, y = stack(households, "train")
+    kwh = np.concatenate([hd.inverse(hd.y["train"][:, 0]) for hd in households])
+    times = np.concatenate([hd.t["train"] for hd in households])
+    order = np.random.default_rng(seed).permutation(len(y))
+    shards = np.array_split(order, K)
+    clients = [WindowClient(i, X[s], y[s], cfg, device) for i, s in enumerate(shards)]
+    hidx = heterogeneity_from_masses([window_shape_mass(kwh[s], times[s]) for s in shards],
+                                     [float(kwh[s].mean()) for s in shards])
+    return clients, hidx
+
+
 def _run_federated(households, cfg, device, seed, verbose):
+    p = cfg["partition"]
+    if p["mode"] == "community" and p["strategy"] == "window_iid":
+        clients, hidx = _window_clients(households, cfg, device, seed)
+        server = FederatedServer(clients, households, cfg, device, seed, verbose)
+        model, history, best = server.run()
+        part = {"partition_mode": "community", "partition_strategy": "window_iid", "alpha": None,
+                "num_clients": len(clients), "households_per_client": int(p["households_per_client"]),
+                **hidx}
+        return model, history, best, part
     if cfg["fed"].get("backend", "sim") == "flower":
         from src.federated.flower_backend import run_flower
         groups, labels = partition_households(households, cfg, seed)
@@ -138,7 +170,6 @@ def _run_federated(households, cfg, device, seed, verbose):
         clients = [HouseholdClient(i, [households[j] for j in g], cfg, device) for i, g in enumerate(groups)]
         server = FederatedServer(clients, households, cfg, device, seed, verbose)
         model, history, best = server.run()
-    p = cfg["partition"]
     hidx = heterogeneity_index([[households[j] for j in g] for g in groups])
     client_of = np.empty(len(households), dtype=int)
     for c, g in enumerate(groups):

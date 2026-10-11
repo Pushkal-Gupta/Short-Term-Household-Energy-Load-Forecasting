@@ -28,18 +28,22 @@ HERE = Path(__file__).resolve().parent
 PAPER = HERE.parent
 ROOT = PAPER.parent
 TEMPLATE = HERE / "template.docx"
-LONG = "--long" in sys.argv                     # --long: the full-length version (content_long.tex)
-CONTENT = HERE / ("content_long.tex" if LONG else "content.tex")
-OUT = HERE / ("manuscript_long.docx" if LONG else "manuscript.docx")
-COPY_TO = ROOT / "submission" / ("manuscript_template_long.docx" if LONG else "manuscript_template.docx")
+VARIANTS = {   # flag -> (content file, output, copy in submission/)
+    "": ("content.tex", "manuscript.docx", "manuscript_template.docx"),
+    "--long": ("content_long.tex", "manuscript_long.docx", "manuscript_template_long.docx"),
+    "--supp": ("content_supp.tex", "supplementary.docx", "supplementary_material.docx"),
+}
+FLAG = next((f for f in VARIANTS if f and f in sys.argv), "")
+SUPP = FLAG == "--supp"
+CONTENT, OUT, COPY_TO = HERE / VARIANTS[FLAG][0], HERE / VARIANTS[FLAG][1], ROOT / "submission" / VARIANTS[FLAG][2]
 XSL_CANDIDATES = [HERE / "mathml2omml.xsl",
                   Path("/Applications/Microsoft Word.app/Contents/Resources/mathml2omml.xsl")]
 
 TITLE = "Fragmentation, not heterogeneity, drives the accuracy cost of federated household load forecasting"
 AUTHORS = [("Pushkal Gupta", "1,*"), ("Vanka Kaushik", "1"), ("Kalaavathi B", "1")]
-AFFILIATIONS = [("1", "Department of Internet of Things, School of Computer Science and Engineering, Vellore "
+AFFILIATIONS = [("1", "School of Computer Science and Engineering, Vellore "
                       "Institute of Technology, Vellore 632014, Tamil Nadu, India")]
-CORRESPONDING = "* Corresponding author: pushkal.gupta2023@vitstudent.ac.in (alternate: pushkalgupta2005@gmail.com)"
+CORRESPONDING = "* Corresponding author: pushkal.gupta2023@vitstudent.ac.in"
 EMAILS = "E-mail addresses: vanka.kaushik2023@vitstudent.ac.in (V. Kaushik), kalaavathi.b@vit.ac.in (Kalaavathi B)"
 ORCID = "ORCID: 0009-0004-7032-6847 (Pushkal Gupta)"
 KEYWORDS = ["smart meters", "long short-term memory", "non-IID data", "communication efficiency",
@@ -69,7 +73,8 @@ def balanced(s: str, i: int) -> tuple[str, int]:
 
 
 def load_macros() -> dict[str, str]:
-    src = (PAPER / "generated" / "numbers.tex").read_text()
+    src = "\n".join((PAPER / "generated" / f).read_text() for f in ("numbers.tex", "numbers_revision.tex")
+                    if (PAPER / "generated" / f).exists())
     out = {}
     for m in re.finditer(r"\\newcommand\{\\([A-Za-z]+)\}", src):
         out[m.group(1)], _ = balanced(src, m.end())
@@ -83,6 +88,12 @@ def expand(text: str, macros: dict[str, str]) -> str:
         text = re.sub(r"\\([A-Za-z]+)(\{\})?",
                       lambda m: macros[m.group(1)] if m.group(1) in macros else m.group(0), text)
     text = re.sub(r"\\nosign\{([^{}]*)\}", lambda m: m.group(1).lstrip("+"), text)
+    while "\\pv{" in text:                                              # p-values: "= 0.0070" or "< 10^-4"
+        i = text.index("\\pv{")
+        body, j = balanced(text, i + 3)
+        v = body.strip()
+        v = v if v.startswith(("$<", "$=", "$>", "n/a")) else f"= {v}"
+        text = text[:i] + v + text[j:]
     text = re.sub(r"\\the\\numexpr\s*(\d+)\s*-\s*(\d+)\s*\\relax", lambda m: str(int(m.group(1)) - int(m.group(2))),
                   text)
     return text
@@ -295,7 +306,7 @@ def caption(kind, num, text, refs, keep_next=False):
              f'<w:t>{kind} {num}.</w:t></w:r>'
              f'<w:r><w:rPr><w:sz w:val="19"/><w:szCs w:val="19"/></w:rPr><w:t xml:space="preserve"> </w:t></w:r>'
              + runs_xml(text, refs, size=19))
-    keep = "<w:keepNext/>" if keep_next else ""
+    keep = "<w:keepNext/><w:keepLines/>" if keep_next else "<w:keepLines/>"
     return para(inner, f'{keep}<w:spacing w:before="80" w:after="160"/><w:jc w:val="both"/>')
 
 
@@ -355,6 +366,9 @@ def table_xml(spec: str, rows: list[list[str]], refs: Refs, prose: bool = False)
             fmt = {"b": True, "color": "FFFFFF"} if head else {}
             if not head and row[0].startswith("This work"):
                 fmt = {"b": True}
+            if re.fullmatch(r"-\d[\d.,]*( \(.*\))?|-\d.*%?", cell.strip()):
+                cell = "−" + cell.strip()[1:]                              # true minus sign
+            cell = re.sub(r"(?<![\w$])-(?=\d)", "−", cell)
             inner = runs_xml(cell, refs, size=size, base=fmt, math_mode="text")
             xml.append(f'<w:tc><w:tcPr><w:tcW w:w="{widths[j]}" w:type="dxa"/>{shade}<w:tcMar>'
                        f'<w:top w:w="40" w:type="dxa"/><w:left w:w="80" w:type="dxa"/><w:bottom w:w="40" w:type="dxa"/>'
@@ -543,8 +557,14 @@ def label_of(s: str) -> str | None:
 def build() -> Path:
     if not TEMPLATE.exists():
         sys.exit(f"Template not found: {TEMPLATE}")
+    global TITLE
     macros = load_macros()
     src = expand(CONTENT.read_text(), macros)
+    tm = re.search(r"\\title\{([^}]*)\}", src)                     # optional \title{} in the content file
+    if tm:
+        TITLE = " ".join(tm.group(1).split())
+        src = src[:tm.start()] + src[tm.end():]
+    prefix = "S" if SUPP else ""
     items = list(blocks(src))
     refs = Refs()
 
@@ -556,13 +576,13 @@ def build() -> Path:
             order[kind].append(lab)
     for kind in order:
         for n, lab in enumerate(order[kind], 1):
-            refs.labels[lab] = str(n)
+            refs.labels[lab] = f"{prefix}{n}"
     eqn = 0
     for kind, payload in items:
         if kind == "equation":
             eqn += 1
             if label_of(payload):
-                refs.labels[label_of(payload)] = str(eqn)
+                refs.labels[label_of(payload)] = f"{prefix}{eqn}"
     doc = Document(str(TEMPLATE))
     body = doc.element.body
     sect = body.sectPr
@@ -586,7 +606,7 @@ def build() -> Path:
         add(para(f'<w:r><w:rPr><w:sz w:val="16"/><w:szCs w:val="16"/><w:vertAlign w:val="superscript"/></w:rPr><w:t>{sup}</w:t></w:r>'
                  f'<w:r><w:rPr><w:i/><w:iCs/><w:sz w:val="19"/><w:szCs w:val="19"/></w:rPr><w:t xml:space="preserve"> {escape(aff)}</w:t></w:r>',
                  '<w:spacing w:after="40"/><w:jc w:val="center"/>'))
-    for line, after in ((CORRESPONDING, 40), (EMAILS, 40), (ORCID, 240)):
+    for line, after in ((CORRESPONDING, 40), (EMAILS, 40), (ORCID, 240)) if not SUPP else ((CORRESPONDING, 240),):
         add(para(f'<w:r><w:rPr><w:i/><w:iCs/><w:sz w:val="19"/><w:szCs w:val="19"/></w:rPr><w:t>{escape(line)}</w:t></w:r>',
                  f'<w:spacing w:after="{after}"/><w:jc w:val="center"/>'))
 
@@ -606,10 +626,10 @@ def build() -> Path:
         if kind == "section":
             sec += 1
             sub = 0
-            add(heading(f"{sec}. {payload}", 1))
+            add(heading(f"{'S' if SUPP else ''}{sec}. {payload}", 1))
         elif kind == "subsection":
             sub += 1
-            add(heading(f"{sec}.{sub} {payload}", 2))
+            add(heading(f"{'S' if SUPP else ''}{sec}.{sub} {payload}", 2))
         elif kind == "par":
             m = re.match(r"\\textbf\{([^}]*)\}\s*(.*)", payload)
             if m and m.group(1).endswith("."):
@@ -660,7 +680,8 @@ def build() -> Path:
 
     # references, numbered in order of first citation
     bib = parse_bib(PAPER / "refs.bib")
-    add(heading("References", 1))
+    if refs.cites:
+        add(heading("References", 1))
     missing = [k for k in refs.cites if k not in bib]
     if missing:
         sys.exit(f"Missing bibliography keys: {missing}")

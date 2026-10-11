@@ -128,14 +128,22 @@ the first seed, selecting on best-round validation MAE. The winners are stored i
   - `dirichlet(α)`: each client draws proportions p ~ Dir(α·1_K) over clusters. Each of its 5
     slots draws a cluster from p, renormalised to clusters with homes left, and takes a random
     home from it.
-  - `cluster`: homes sorted by (cluster, mean load) and chunked, which is the maximal
-    separation.
+  - `cluster`: homes sorted by (cluster, mean load) and chunked.
+  - `shape`: homes sorted by the first principal component of their normalised hour-of-week
+    shape and chunked, the widest load-shape split that equal-sized clients allow.
+  - `window_iid` (IID control, `src/experiments/common.py::_window_clients`): not a grouping of
+    homes. The pooled training windows of all homes are dealt at random into K equal shards, so
+    clients do not differ and only fragmentation remains.
+
+  Every strategy gives clients of exactly 100/K homes (window counts differ slightly between
+  homes because windows touching long gaps are dropped).
 
   Because the households, and so the test windows, are identical across strategies, differences
   in error are caused by the partition alone.
 - **Heterogeneity index H:** H_JS is the mean pairwise Jensen–Shannon divergence (base 2) between
-  clients' hour-of-week consumption distributions. H_CV is the coefficient of variation of client
-  mean load. H = H_JS + H_CV/(1 + H_CV). It is computed from train data and reported for every run,
+  clients' hour-of-week consumption distributions, bounded in [0, 1]. H_CV is the coefficient of
+  variation of client mean load. The composite H = H_JS + H_CV/(1 + H_CV) is still logged, but the
+  revised paper uses H_JS and H_CV separately, because the level term made up most of H. It is computed from train data and reported for every run,
   so results can be plotted against measured rather than nominal heterogeneity.
 
 ## 8. Metrics (`src/evaluation/metrics.py`)
@@ -177,6 +185,19 @@ which validation MAE first comes within ε = 10 % of the centralised validation 
 | E13 | FedAvg, FedProx, HA-FedProx | 1 household = 1 client | natural heterogeneity |
 | E14 | FedAvg | random, K ∈ {1, 5, 50} | fragmentation sweep (K = 20 is E3, K = 100 is E13) |
 
+Revision matrix (`configs/matrix_revision.yaml`, 86 runs; analysed by `src/evaluation/revision.py`):
+
+| ID | Arm | Partition | Notes |
+|---|---|---|---|
+| E15 | FedAvg | `window_iid`, K ∈ {5, 20, 50, 100} | IID control: fragmentation without heterogeneity |
+| E16 | FedAvg | `shape`, K = 20 | widest load-shape split; seeds 42–46 |
+| E17 | client-only | random, K ∈ {5, 20} | each client trains alone on its pooled homes (`baselines/local.py::run_client_local`) |
+| E18 | FedAvg | random, K ∈ {20, 50, 100} | up to 100 rounds, stop after 25 rounds without a new best (`fed.patience_rounds`) |
+| E19 | centralised, local, FedAvg K ∈ {20, 100} | – / random | sine/cosine time-of-day and day-of-week inputs |
+| C43, C44 | centralised, local, FedAvg K ∈ {1, 5, 20, 100} | random | two further cohorts (selection seeds 43, 44), seeds 42–43 |
+| T2 | FedProx μ ∈ {0, 1e-4}, HA-FedProx μ0 ∈ {1e-3, 1e-4} | cluster | proximal grid down to zero |
+| E3, E4, E6, E8, E10, E12 | as main matrix | as main matrix | two extra seeds (45, 46) |
+
 Budget: federated runs use 30 rounds × 1 local epoch, the same number of passes over the data
 as the centralised arm's 30-epoch cap. Each runs on 3 seeds (42, 43, 44); the seed changes model
 initialisation, client sampling, stragglers and random/Dirichlet groupings. The household cohort
@@ -185,6 +206,10 @@ epoch, is evaluated for every federated run and adds no communication.
 
 Statistics (`report.py`): paired Wilcoxon signed-rank tests on per-household test MAE (averaged
 over seeds) for the comparisons listed in `stats_tests.csv`, with Holm correction across the family.
+
+Clients are stateless: every local update builds a fresh Adam optimiser from the received global
+weights, so no optimiser moments survive between rounds. Local-only and client-only models train for
+at most 30 epochs with early stopping on validation MAE (patience 4).
 
 ## 11. Reproducibility
 

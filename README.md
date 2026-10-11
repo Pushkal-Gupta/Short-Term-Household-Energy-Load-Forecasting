@@ -4,7 +4,7 @@ Code, experiments and manuscript for a controlled, communication-priced study of
 short-term load forecasting on the Low Carbon London (LCL) smart-meter data.
 
 **Pushkal Gupta**\* · **Vanka Kaushik** · **Kalaavathi B**  
-Department of Internet of Things, School of Computer Science and Engineering, Vellore Institute of Technology, Vellore, India  
+School of Computer Science and Engineering, Vellore Institute of Technology, Vellore, India  
 \*Corresponding author: pushkal.gupta2023@vitstudent.ac.in
 
 | | |
@@ -14,7 +14,7 @@ Department of Internet of Things, School of Computer Science and Engineering, Ve
 | **Model** | one LSTM (64 hidden units, 17,217 parameters) shared by every arm |
 | **Arms** | persistence · seasonal naive · local-only · centralised · FedAvg · FedProx · HA-FedProx · FedAvg + local fine-tuning |
 | **Stack** | PyTorch; deterministic in-process FL simulator; optional Flower backend that reproduces it exactly |
-| **Manuscript** | [`paper/manuscript.tex`](paper/manuscript.tex) → `paper/manuscript.pdf` (Elsevier `elsarticle`); Word versions in the IMRaD journal template: [`paper/docx/manuscript.docx`](paper/docx/manuscript.docx) (11 pages) and `manuscript_long.docx` (full length) |
+| **Manuscript** | [`paper/manuscript.tex`](paper/manuscript.tex) → `paper/manuscript.pdf` (Elsevier `elsarticle`); revised Word version in the IMRaD journal template: [`paper/docx/manuscript.docx`](paper/docx/manuscript.docx) (12 pages) with `supplementary.docx`, and a point-by-point [`submission/response_to_review.docx`](submission/response_to_review.docx); `manuscript_long.docx` and the LaTeX version predate the revision |
 
 ![Graphical abstract](results/plots/graphical_abstract.png)
 
@@ -189,7 +189,7 @@ python -m src.experiments.run_matrix --phase tune --workers 8   # μ / μ0 selec
 python -m src.experiments.run_matrix --phase main --workers 8   # E0–E14 × 3 seeds (resumable)
 python -m src.experiments.make_report             # CSVs, statistics, plots, paper/generated/*.tex
 make paper                                        # paper/manuscript.pdf (tectonic or pdflatex)
-make docx                                         # paper/docx/manuscript{,_long}.docx (IMRaD Word template)
+make docx                                         # revision analyses, Word manuscript, supplement, long version, review response
 ```
 
 The full matrix takes about 8 h on one Apple M5 Max with 8 parallel runs. Finished runs are skipped
@@ -269,7 +269,7 @@ src/
   experiments/  run_baselines · run_fedavg · run_fedprox · run_matrix · run_demo · make_report · common
 results/      metrics/ · plots/ · logs/ · demo/ (synthetic only)
 paper/        manuscript.tex · sections/ · refs.bib · generated/ · figures/ · LITERATURE_NOTES.md
-  docx/       template.docx · content.tex (11 pages) · content_long.tex · build_docx.py · workflow_figure.py
+  docx/       template.docx · content.tex (12 pages) · content_supp.tex · content_long.tex · build_docx.py · response.py · workflow_figure.py
 docs/         TECHNICAL.md
 tests/        test_core.py
 ```

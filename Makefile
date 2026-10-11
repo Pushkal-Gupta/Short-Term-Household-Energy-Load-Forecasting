@@ -16,7 +16,7 @@ help:
 	@echo "make matrix      - full experiment matrix, 3 seeds, WORKERS=$(WORKERS) in parallel"
 	@echo "make report      - tables, statistics, plots, paper/generated/*.tex"
 	@echo "make paper       - compile paper/manuscript.pdf (needs tectonic or pdflatex)"
-	@echo "make docx        - Word versions in the IMRaD journal template (11-page and full-length)"
+	@echo "make docx        - Word manuscript (12 pages), supplement, full-length version and review response"
 	@echo "make clean       - remove caches"
 
 venv:
@@ -60,9 +60,12 @@ paper:
 	cd paper && (command -v tectonic >/dev/null && tectonic manuscript.tex || (pdflatex manuscript && bibtex manuscript && pdflatex manuscript && pdflatex manuscript))
 
 docx:
+	$(PY) -m src.evaluation.revision
 	$(PY) paper/docx/workflow_figure.py
 	$(PY) paper/docx/build_docx.py
 	$(PY) paper/docx/build_docx.py --long
+	$(PY) paper/docx/build_docx.py --supp
+	$(PY) paper/docx/response.py
 
 clean:
 	rm -rf __pycache__ src/__pycache__ .pytest_cache

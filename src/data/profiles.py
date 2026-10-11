@@ -18,6 +18,7 @@ Heterogeneity index (between federated clients)
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
 from scipy.spatial.distance import jensenshannon
 from sklearn.cluster import KMeans
 
@@ -49,6 +50,33 @@ def cluster_profiles(households, k: int, seed: int) -> np.ndarray:
     k = min(k, len(households))
     km = KMeans(n_clusters=k, n_init=10, random_state=seed)
     return km.fit_predict(profile_features(households))
+
+
+def week_shape_pc1(households) -> np.ndarray:
+    """Score of each home on the first principal component of its normalised hour-of-week shape."""
+    S = np.array([_binned(hd, "week", 168) for hd in households])
+    S = S / np.maximum(S.sum(1, keepdims=True), 1e-12)
+    S = S - S.mean(0)
+    _, _, vt = np.linalg.svd(S, full_matrices=False)
+    return S @ vt[0]
+
+
+def window_shape_mass(kwh: np.ndarray, times: np.ndarray) -> np.ndarray:
+    """Mean consumption per hour-of-week bin of a set of target readings (window-level clients)."""
+    t = pd.DatetimeIndex(times)
+    b = t.dayofweek.to_numpy() * 24 + t.hour.to_numpy()
+    sums = np.bincount(b, weights=kwh, minlength=168)
+    return sums / np.maximum(np.bincount(b, minlength=168), 1)
+
+
+def heterogeneity_from_masses(dists: list[np.ndarray], means: list[float]) -> dict:
+    dists = [d / max(d.sum(), 1e-12) for d in dists]
+    K = len(dists)
+    js = [jensenshannon(dists[i], dists[j], base=2) ** 2 for i in range(K) for j in range(i + 1, K)]
+    h_js = float(np.mean(js)) if js else 0.0
+    means = np.asarray(means)
+    h_cv = float(means.std() / means.mean()) if means.mean() > 0 else 0.0
+    return {"H_JS": h_js, "H_CV": h_cv, "H": h_js + h_cv / (1.0 + h_cv)}
 
 
 def hour_of_week_mass(households) -> np.ndarray:

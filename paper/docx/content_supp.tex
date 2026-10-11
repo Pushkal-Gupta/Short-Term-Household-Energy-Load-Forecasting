@@ -1,0 +1,108 @@
+% Supplementary material for the Word-template manuscript. Built by: python paper/docx/build_docx.py --supp
+% Same restricted LaTeX as content.tex; tables, figures and equations are numbered S1, S2, ...
+% Every number comes from generated/*.tex. Do not type results by hand.
+
+\title{Supplementary material}
+
+\section{Paired household-level tests}
+Table~\ref{tab:stats} lists every paired comparison. Each household's test MAE was averaged over the seeds of an arm
+before testing, so each test has one pair per household (100 pairs). The Holm correction was applied over all rows of
+the table together. Median $\Delta$MAE is the median over households of the difference A minus B; negative values
+favour A.
+
+\begin{table}
+\caption{Wilcoxon signed-rank tests over households (seed-averaged MAE). A better: share of households with lower MAE
+under A.}\label{tab:stats}
+\input{generated/table_stats.tex}
+\end{table}
+
+\section{Training budget and round selection}
+Table~\ref{tab:budget} gives, for each number of clients, the local Adam steps per client and round, the round chosen
+on validation error and the test MAE, for the 30-round budget of the main text and for runs of up to 100 rounds that
+stopped after 25 rounds without a new best validation MAE. Fig.~\ref{fig:budget} shows the validation curves.
+
+\begin{table}
+\caption{Budget per number of clients $K$ (FedAvg, random grouping). Steps/round: Adam steps per client per round.
+Best rd.: round selected on validation MAE (mean over seeds). Gap: test MAE relative to centralised.}\label{tab:budget}
+\input{generated/rev_budget.tex}
+\end{table}
+
+\begin{figure}
+\includegraphics[width=0.85]{revision_budget.png}
+\caption{Validation MAE per round for each number of clients (mean over seeds). Solid: 30-round runs; dashed: runs of up
+to 100 rounds. Dotted: centralised.}\label{fig:budget}
+\end{figure}
+
+\section{Heterogeneity-adaptive proximal coefficient}
+The original submission proposed a rule that sets the proximal coefficient from the disagreement between client
+updates. After round $r$ the server holds the updates $\Delta_k=w_k-w_r$ and their weighted mean $\bar{\Delta}$, and
+computes
+\begin{equation}\label{eq:rho}
+\rho_r=\frac{\sum_k p_k\lVert\Delta_k-\bar{\Delta}\rVert^2}{\sum_k p_k\lVert\Delta_k\rVert^2}\in[0,1],\qquad \mu_{r+1}=\mathrm{clip}\left(\mu_0\rho_r,\ 10^{-4},\ 1\right).
+\end{equation}
+The rule never improved on FedAvg. Under the cluster partition it was worse for
+\the\numexpr100-\StEonezerohafedproxstrongvsEsixfedavgstrongBetter\relax\,\% of households ($p_{\mathrm{Holm}}$
+\pv{\StEonezerohafedproxstrongvsEsixfedavgstrongP}). Its signal $\rho_r$ ranked partitions by heterogeneity (Spearman
+\RhoHSpearman{} with $H_{\mathrm{JS}}$, $p$ \pv{\RhoHSpearmanP}, $n=\RhoHRuns{}$ runs), but on average it rose from
+\RhoRoundOne{} in round 1 to \RhoLast{} in the last round, a change about \RhoWithinOverBetween{} times its spread across
+partitions. As the shared descent direction shrinks during training, any residual disagreement pushes $\rho_r$ towards
+one, so a coefficient proportional to it grows late in training whatever the data. Table~\ref{tab:hetfull} gives all
+three aggregation rules for each grouping.
+
+\begin{table}
+\caption{All aggregation rules for each grouping at $K=20$ (three seeds). $H$: composite index of the original
+submission; $\bar\rho$: mean update disagreement.}\label{tab:hetfull}
+\input{generated/table_heterogeneity.tex}
+\end{table}
+
+\section{Proximal coefficient grid}
+Table~\ref{tab:tuning} gives the best validation MAE for each coefficient (cluster partition, seed 42). The row
+$\mu=0$ is plain FedAvg.
+
+\begin{table}
+\caption{Best-round validation MAE (kWh) over the proximal coefficient grid.}\label{tab:tuning}
+\input{generated/rev_tuning.tex}
+\end{table}
+
+\section{Additional cohorts}
+Two further cohorts of 100 homes were drawn with the same eligibility rules and stratification but different selection
+seeds (43 and 44); they share three or four homes with the main cohort. Each arm ran with two seeds.
+
+\begin{table}
+\caption{Test MAE (kWh) of the main arms on three cohorts, and the FedAvg gap to centralised training at $K=1$, 5,
+20 and 100.}\label{tab:cohorts}
+\input{generated/rev_cohorts.tex}
+\end{table}
+
+\section{Error by consumption quintile}
+Households were divided into quintiles of mean training load (Q1 lowest). Table~\ref{tab:quint} gives the median
+household test MAE in each quintile, Fig.~\ref{fig:equity} the distribution of the benefit of each arm over local
+training, and Table~\ref{tab:equity} summary statistics of that benefit.
+
+\begin{table}
+\caption{Median household test MAE (kWh) by consumption quintile. FedAvg at $K=20$ unless stated.}\label{tab:quint}
+\input{generated/rev_quintiles.tex}
+\end{table}
+
+\begin{figure}
+\includegraphics[width=0.7]{federation_benefit_cdf.png}
+\caption{Distribution over households of the benefit of each collaborative arm over local training
+($\mathrm{MAE}_{\mathrm{local}}-\mathrm{MAE}_{\mathrm{arm}}$, kWh; left of zero means worse off).}\label{fig:equity}
+\end{figure}
+
+\begin{table}
+\caption{Equity relative to local-only training (seed-averaged household MAE): share harmed (any difference), median
+benefit, 90th-percentile household MAE and share harmed after fine-tuning (FT).}\label{tab:equity}
+\input{generated/table_equity.tex}
+\end{table}
+
+\section{Calendar inputs and scaled error}
+Sine and cosine encodings of time of day and day of week were added as input channels to every arm in
+Table~\ref{tab:cal}, with all other settings unchanged.
+
+\begin{table}
+\caption{Effect of calendar inputs, and MASE (scaled per household by the in-sample one-step naive MAE). Gain: MAE
+reduction relative to persistence; cal.: with calendar inputs. Gap: MAE relative to centralised training with the same
+inputs.}\label{tab:cal}
+\input{generated/rev_calendar.tex}
+\end{table}

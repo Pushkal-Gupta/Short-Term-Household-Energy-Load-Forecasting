@@ -19,14 +19,23 @@ dirichlet   for every client, cluster proportions p ~ Dir(alpha * 1_K). Each of 
             draws a cluster from p (renormalised over clusters that still have homes left)
             and takes a random home from that cluster. alpha large -> IID-ish; alpha small ->
             each client dominated by one profile.
-cluster     strongest non-IID: homes sorted by (profile cluster, mean load) and chunked, so
-            each client holds near-identical homes and clients differ maximally.
+cluster     homes sorted by (profile cluster, mean load) and chunked, so each client holds
+            near-identical homes.
+shape       widest load-SHAPE heterogeneity: homes sorted by the first principal component of
+            their normalised hour-of-week shape and chunked, so neighbouring shapes share a
+            client and the clients' shapes differ as much as a contiguous split allows.
+window_iid  not a grouping of homes: the pooled training WINDOWS of all homes are dealt at random
+            into equal shards (src/experiments/common.py). Every client sees the same mixture
+            of homes, so heterogeneity is ~0 and only fragmentation remains (IID control).
+
+Every strategy gives clients of exactly `households_per_client` homes (equal sizes in homes;
+window counts differ slightly between homes because of dropped windows).
 """
 from __future__ import annotations
 
 import numpy as np
 
-from src.data.profiles import cluster_profiles
+from src.data.profiles import cluster_profiles, week_shape_pc1
 
 
 def partition_households(households, cfg: dict, seed: int) -> tuple[list[list[int]], np.ndarray]:
@@ -52,6 +61,9 @@ def partition_households(households, cfg: dict, seed: int) -> tuple[list[list[in
     elif strategy == "cluster":
         means = np.array([np.nanmean(hd.train_kwh) for hd in households])
         order = np.lexsort((means, labels))
+        clients = [sorted(order[i:i + m].tolist()) for i in range(0, n, m)]
+    elif strategy == "shape":
+        order = np.argsort(week_shape_pc1(households), kind="stable")
         clients = [sorted(order[i:i + m].tolist()) for i in range(0, n, m)]
     elif strategy == "dirichlet":
         clients = _dirichlet(labels, m, float(alpha), rng)

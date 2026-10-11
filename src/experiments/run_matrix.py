@@ -50,7 +50,7 @@ def run_phase(cfg, entries, seeds, tuning, workers, only=None):
     for e in entries:
         if only and e["name"] not in only:
             continue
-        for seed in seeds:
+        for seed in e.get("seeds", seeds):                 # an entry may carry its own seed list
             out = results_path(cfg, "metrics", "runs", f"{e['name']}__seed{seed}.json")
             if out.exists():
                 continue

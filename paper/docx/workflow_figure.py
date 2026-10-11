@@ -41,7 +41,7 @@ def main(path: Path = OUT) -> Path:
 
     # 1. data
     box(ax, 0.010, 0.255, 0.190, 0.665, "1. Data (LCL trial)",
-        ["100 standard-tariff homes", "half-hourly kWh, 2013", "stratified by load quintile", "",
+        ["3 cohorts × 100 homes", "standard tariff", "half-hourly kWh, 2013", "stratified by load quintile", "",
          "train  Jan–Aug", "valid. Sep–Oct", "test    Nov–Dec", "", "per-home scaling", "window 48 → 1"])
 
     # 2. partition: 100 homes coloured by load-profile cluster, grouped into clients
@@ -59,15 +59,15 @@ def main(path: Path = OUT) -> Path:
                     color=CLUSTER[m], mec="none")
     ax.text(0.350, 0.535, "homes coloured by load-profile cluster", ha="center", va="top", fontsize=6.3,
             color=INK, style="italic")
-    ax.text(0.242, 0.480, "grouping: random,\nDirichlet($\\alpha$) or cluster\n$K \\in$ {1, 5, 20, 50, 100}\n"
-            "measured $H_{JS}$ and $H$\n(training data only)", ha="left", va="top", fontsize=7.1, color=INK, linespacing=1.45)
+    ax.text(0.242, 0.480, "homes: random, Dirichlet($\\alpha$),\ncluster or shape-sorted;\nIID control: windows dealt\nat random\n$K \\in$ {1, 5, 20, 50, 100}\n"
+            "measured $H_{JS}$, $H_{CV}$ (train only)", ha="left", va="top", fontsize=7.1, color=INK, linespacing=1.45)
 
     # 3. federated rounds
-    box(ax, 0.500, 0.255, 0.275, 0.665, "3. Federated rounds ($T$ = 30)", [])
+    box(ax, 0.500, 0.255, 0.275, 0.665, "3. Federated rounds", [])
     ax.add_patch(FancyBboxPatch((0.530, 0.705), 0.215, 0.110, boxstyle="round,pad=0.004,rounding_size=0.01",
                                 fc=NAVY, ec=NAVY))
     ax.text(0.6375, 0.775, "Server", ha="center", va="center", fontsize=8, weight="bold", color="white")
-    ax.text(0.6375, 0.735, "FedAvg · FedProx · HA-FedProx", ha="center", va="center", fontsize=6.6,
+    ax.text(0.6375, 0.735, "FedAvg · FedProx", ha="center", va="center", fontsize=6.6,
             color="white")
     for i, x in enumerate([0.515, 0.600, 0.685]):
         ax.add_patch(FancyBboxPatch((x, 0.440), 0.076, 0.095, boxstyle="round,pad=0.003,rounding_size=0.008",
@@ -78,16 +78,16 @@ def main(path: Path = OUT) -> Path:
         arrow(ax, (x + 0.024, 0.700), (x + 0.024, 0.540), color=BLUE)
         arrow(ax, (x + 0.052, 0.540), (x + 0.052, 0.700), color="#c0504d")
     ax.text(0.620, 0.620, "", ha="center")
-    ax.text(0.507, 0.620, "$w_t$", fontsize=7, color=BLUE, ha="left")
+    ax.text(0.507, 0.620, "$w_r$", fontsize=7, color=BLUE, ha="left")
     ax.text(0.768, 0.620, "$w_k$", fontsize=7, color="#c0504d", ha="right")
-    ax.text(0.510, 0.415, "1 local epoch per round\nbytes: $P\\cdot b$ per message,\n$b$ = 4 (fp32) or 2 (fp16)\n"
-            "participation $C$, stragglers $p_s$\n$\\mu_t$ set from disagreement $\\rho_t$", ha="left", va="top",
+    ax.text(0.510, 0.415, "$R$ = 30 (or ≤ 100) rounds × 1 epoch\nbytes: $P\\cdot b$ per message,\n$b$ = 4 (fp32) or 2 (fp16)\n"
+            "participation $C$, stragglers $p_s$\nfresh Adam state per round", ha="left", va="top",
             fontsize=6.8, color=INK, linespacing=1.35)
 
     # 4. evaluation
     box(ax, 0.805, 0.255, 0.185, 0.665, "4. Evaluation",
-        ["best round on validation", "one fixed test set", "", "MAE, RMSE, WAPE, MAPE*",
-         "R@ε and B@ε", "Wilcoxon + Holm", "per household", "", "+ local fine-tuning", "  (FT)"])
+        ["best round on validation", "one fixed test set", "", "MAE, RMSE, WAPE, MASE",
+         "R@ε, B@ε, excess", "Wilcoxon + Holm", "per household", "", "+ local fine-tuning", "  (FT)"])
 
     for x0, x1 in [(0.200, 0.230), (0.470, 0.500), (0.775, 0.805)]:
         arrow(ax, (x0 + 0.002, 0.61), (x1 - 0.002, 0.61))
@@ -97,8 +97,8 @@ def main(path: Path = OUT) -> Path:
                                 fc="white", ec=NAVY, lw=0.8, ls="--"))
     ax.text(0.5, 0.140, "Reference arms on the same homes, split, model and budget", ha="center", va="center",
             fontsize=8, weight="bold", color=NAVY)
-    ax.text(0.5, 0.072, "persistence  ·  seasonal naive (t − 48)  ·  local-only (one LSTM per home)  ·  "
-            "centralised (pooled raw data, 30 epochs)", ha="center", va="center", fontsize=7.2, color=INK)
+    ax.text(0.5, 0.072, "persistence  ·  seasonal naive  ·  local-only (one LSTM per home)  ·  "
+            "client-only (each client alone)  ·  centralised (pooled raw data)", ha="center", va="center", fontsize=7.2, color=INK)
     arrow(ax, (0.105, 0.255), (0.105, 0.187), style="-|>")
     arrow(ax, (0.897, 0.187), (0.897, 0.255), style="-|>")
 

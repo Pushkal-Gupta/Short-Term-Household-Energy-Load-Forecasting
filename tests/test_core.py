@@ -168,3 +168,22 @@ def test_seeded_runs_are_reproducible(cfg, households):
     for x, y in zip(w1, w2):
         np.testing.assert_array_equal(x, y)
     assert h1[-1]["cumulative_bytes"] == h2[-1]["cumulative_bytes"] > 0
+
+
+def test_shape_partition_uses_every_household_once(cfg, households):
+    c = with_overrides(cfg, **{"partition.mode": "community", "partition.households_per_client": 2,
+                               "partition.strategy": "shape"})
+    clients, _ = partition_households(households, c, seed=0)
+    assert sorted(i for g in clients for i in g) == list(range(len(households)))
+    assert all(len(g) == 2 for g in clients)
+
+
+def test_window_iid_clients_conserve_windows(cfg, households):
+    from src.experiments.common import _window_clients
+    c = with_overrides(cfg, **{"partition.mode": "community", "partition.households_per_client": 2,
+                               "partition.strategy": "window_iid"})
+    clients, hidx = _window_clients(households, c, "cpu", seed=0)
+    assert len(clients) == len(households) // 2
+    assert sum(cl.num_train for cl in clients) == sum(hd.n("train") for hd in households)
+    assert max(cl.num_train for cl in clients) - min(cl.num_train for cl in clients) <= 1
+    assert 0.0 <= hidx["H_JS"] < 0.05

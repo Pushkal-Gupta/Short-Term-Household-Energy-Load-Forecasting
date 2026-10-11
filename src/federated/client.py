@@ -49,8 +49,23 @@ class HouseholdClient:
         return get_weights(self.model), self.num_train, {"train_loss": loss, "epochs_done": epochs}
 
     def evaluate(self, parameters: list, config: dict | None = None):
+        if not self.households:
+            raise NotImplementedError("window-level clients are evaluated by the server only")
         set_weights(self.model, parameters)
         split = (config or {}).get("split", "val")
         pairs = predict_households(self.model, self.households, split, self.device)
         m = pooled_metrics(pairs, self.cfg["eval"]["mape_min_actual"])
         return float(m["rmse"] ** 2), m["n_points"], {"mae": m["mae"], "rmse": m["rmse"]}
+
+
+class WindowClient(HouseholdClient):
+    """A client that holds an arbitrary set of training windows (IID control, `window_iid`).
+
+    Its windows are a random shard of every home's windows, so it has no household identity.
+    """
+
+    def __init__(self, cid: int, X: np.ndarray, y: np.ndarray, cfg: dict, device):
+        self.cid, self.households, self.cfg, self.device = cid, [], cfg, device
+        self._X, self._y = X, y
+        self.num_train = len(y)
+        self.model = build_model(cfg).to(device)

@@ -195,3 +195,9 @@ The "FL can be worse than local" finding is therefore **already published** (not
 - **ICLR papers (acar2021feddyn, reddi2021fedopt, li2020qffl).** The venue is confirmed via the arXiv comment fields and the iclr.cc / mlanthology listings. The OpenReview pages could not be fetched (bot check), so the entries use arXiv URLs.
 - **CIRED 2015 LCL paper.** Its DOI could not be found, so it was not added.
 - **Indexing (Scopus/WoS) of the original 27 references.** Not checked.
+
+## Revision checks (2026-10-11)
+
+- **briggs2022, Table II (verified from arXiv 2105.13325v2):** two-layer LSTM with 20 hidden units per layer, hourly sequences of 6/12/24 steps, with and without weather; up to 500 epochs with early stopping. Mean RMSE: centralised 0.0205, localised 0.0196, so centralised was 4.8 % *worse* than localised. FL was 7.6 % worse, FL+HC 4.7 % worse, and FL→LFT 4.3 % better. RMSE is averaged over clients for the distributed arms and over all sequences for the centralised arm.
+- **taik2020 (verified from arXiv 2201.11248):** two LSTM hidden layers of 200 neurons each. The text says "the size of the model is 1,9Kb and the size of the used data is 16Mb". Two such layers hold about 4.8×10^5 weights, which is about 1.9 MB in 32-bit floats, so the reported unit is probably a slip. The quotation is correct, though.
+- **Local SGD:** stich2019localsgd (ICLR 2019), woodworth2020localsgd (ICML 2020, PMLR 119:10334–10343) and woodworth2020minibatch (NeurIPS 2020; the proceedings page lists no page range). All were verified on the proceedings or arXiv pages.
