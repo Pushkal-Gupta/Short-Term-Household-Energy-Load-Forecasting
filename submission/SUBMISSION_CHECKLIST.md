@@ -19,13 +19,13 @@ same `elsarticle` format and also publishes federated-learning work for energy.
 
 ## Before you press Submit (only the authors can do these)
 
-- [x] Dr. Kalaavathi B has agreed to be listed as an author (confirmed by the corresponding author, 2026-10-10).
+- [x] Dr. Kalaavathi B has agreed to be listed as an author (confirmed 2026-10-10); she is the corresponding author from 2026-10-14.
 - [ ] **All three authors read and approve** the final manuscript, the author order and the CRediT roles
       (Kalaavathi B: Supervision, Methodology, Writing – review & editing).
 - [ ] **Each author revises parts of the text in their own words**, especially the Introduction and Discussion.
       This is the most reliable way to make the paper read as the authors' own work.
 - [ ] Confirm the **affiliation** wording for all authors.
-- [ ] ORCID of the corresponding author: 0009-0004-7032-6847 (in the Word version; enter it in Editorial Manager too).
+- [x] ORCIDs on the title page: P. Gupta 0009-0004-7032-6847, V. Kaushik 0009-0003-0735-264X, Kalaavathi B (corresponding) 0000-0003-4027-3137. Enter them in Editorial Manager too.
 - [ ] Word version: set the journal name in the page header (currently "Manuscript for review").
 - [ ] Confirm the **CRediT statement** in `paper/sections/declarations.tex`.
 - [ ] Confirm **funding** ("no specific grant") and **competing interests** ("none").
@@ -53,9 +53,23 @@ same `elsarticle` format and also publishes federated-learning work for energy.
 - [ ] `manuscript_template_long.*`, `manuscript.pdf` (LaTeX) and the cover letter, highlights and graphical abstract
       predate the revision and still carry the old claims. Bring them in line before using any of them.
 
+## Second internal review revision (2026-10-14)
+
+- [x] 96 runs (`configs/matrix_revision2.yaml`, `configs/matrix_revision2_opt.yaml`): plateau runs for homes and the
+      IID control at K = 20, 50, 100; kept Adam state, client SGD and FedAdam with a validation step-size grid; the
+      control in both further cohorts; client-only + FT; seeds 45-46 for the main 30-round arms.
+- [x] Run-level tests with one Holm correction (Supplementary Table S1); cohort table moved into the paper (Table 4).
+- [x] New title: "Training budget and fragmentation, more than heterogeneity, drive the accuracy cost of federated
+      household load forecasting". Abstract 238 words.
+- [x] All three ORCIDs on the title page; Dr Kalaavathi B is corresponding author (manuscript, supplement, cover letter).
+- [x] Manuscript 15 pages, supplement 6 pages: `manuscript_template.*`, `supplementary_material.*`.
+- [x] Response to the 16 points: `response_to_review_2.docx` / `.pdf` (`response_to_review.*` is the first round).
+- [x] Cover letter and highlights updated to the new findings.
+- [ ] Graphical abstract (`graphical_abstract.png`) still shows the original claims; redo before submission.
+
 ## Editorial Manager steps
 
-1. Create or log in to an Elsevier account as the corresponding author (pushkal.gupta2023@vitstudent.ac.in).
+1. Create or log in to an Elsevier account as the corresponding author, Dr Kalaavathi B (kalaavathi.b@vit.ac.in).
 2. Choose *Research Paper* as the article type.
 3. Upload, in order: manuscript PDF, highlights, graphical abstract, cover letter, supplementary archive.
 4. Enter the title, abstract and keywords: copy them from the PDF.

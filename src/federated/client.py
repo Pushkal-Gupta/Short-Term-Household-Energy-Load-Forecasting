@@ -27,6 +27,22 @@ class HouseholdClient:
         self._X, self._y = stack(households, "train")   # local, private training data
         self.num_train = len(self._y)
         self.model = build_model(cfg).to(device)
+        self._opt = None                                 # kept across rounds only for fed.client_optimizer = adam_keep
+
+    def _optimizer(self):
+        """fed.client_optimizer: adam (fresh state every round, the default) | adam_keep (state kept across
+        rounds) | sgd (plain SGD with fed.client_lr)."""
+        f, lr = self.cfg["fed"], float(self.cfg["train"]["lr"])
+        kind = f.get("client_optimizer", "adam")
+        if kind == "adam":
+            return None                                  # train_epochs builds a fresh Adam
+        if kind == "adam_keep":
+            if self._opt is None:
+                self._opt = torch.optim.Adam(self.model.parameters(), lr=lr)
+            return self._opt
+        if kind == "sgd":
+            return torch.optim.SGD(self.model.parameters(), lr=float(f["client_lr"]))
+        raise ValueError(f"unknown fed.client_optimizer {kind!r}")
 
     # --- Flower NumPyClient interface ---------------------------------------------------
     def get_parameters(self, config=None) -> list:
@@ -45,7 +61,7 @@ class HouseholdClient:
         rng = np.random.default_rng(int(config.get("seed", 0)))
         torch.manual_seed(int(config.get("seed", 0)))
         loss = train_epochs(self.model, self._X, self._y, self.device, self.cfg, rng, epochs,
-                            prox_ref=prox_ref, mu=mu)
+                            optimizer=self._optimizer(), prox_ref=prox_ref, mu=mu)
         return get_weights(self.model), self.num_train, {"train_loss": loss, "epochs_done": epochs}
 
     def evaluate(self, parameters: list, config: dict | None = None):
@@ -69,3 +85,4 @@ class WindowClient(HouseholdClient):
         self._X, self._y = X, y
         self.num_train = len(y)
         self.model = build_model(cfg).to(device)
+        self._opt = None

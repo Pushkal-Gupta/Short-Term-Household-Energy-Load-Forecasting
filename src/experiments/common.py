@@ -76,7 +76,10 @@ def run_experiment(cfg: dict, method: str, seed: int, name: str, save_prediction
         history = [{"LCLid": hd.hid, **h} for hd, hs in zip(households, hists) for h in hs]
     elif method == "clientlocal":
         groups, labels = partition_households(households, cfg, seed)
-        pairs, hists = run_client_local(households, groups, cfg, device, seed, verbose)
+        pairs, hists, ft_pairs = run_client_local(households, groups, cfg, device, seed, verbose)
+        if ft_pairs is not None:
+            extra_pairs["finetuned"] = ft_pairs
+            summary.update({f"ft_{k}": v for k, v in pooled_metrics(ft_pairs, mn).items()})
         hidx = heterogeneity_index([[households[j] for j in g] for g in groups])
         summary.update({"algorithm": "clientlocal", "rounds": 0, "total_bytes": 0,
                         "num_clients": len(groups), "households_per_client": len(groups[0]),
@@ -98,6 +101,8 @@ def run_experiment(cfg: dict, method: str, seed: int, name: str, save_prediction
                         "client_fraction": f["client_fraction"], "mu": f.get("mu"),
                         "straggler_prob": f.get("straggler_prob", 0.0),
                         "update_precision": f.get("update_precision", "float32"),
+                        "client_optimizer": f.get("client_optimizer", "adam"),
+                        "server_optimizer": f.get("server_optimizer") or "none",
                         "total_bytes": history[-1]["cumulative_bytes"],
                         "bytes_to_best_round": best["cumulative_bytes"],
                         "payload_bytes": history[-1]["payload_bytes"], **part})

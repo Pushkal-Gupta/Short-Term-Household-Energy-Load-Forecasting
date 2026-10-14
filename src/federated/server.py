@@ -13,6 +13,11 @@ One round t:
     for the convergence plots only and are never used for any decision.
  7. HA-FedProx updates mu from the dissimilarity of the round's updates.
 
+With fed.server_optimizer = adam, step 5 is FedAdam (Reddi et al., 2021): the aggregated change
+Delta = W - W_global is treated as a pseudo-gradient and the server applies an Adam step
+    m <- b1 m + (1 - b1) Delta,  v <- b2 v + (1 - b2) Delta^2,  W_global <- W_global + eta m / (sqrt(v) + tau)
+with eta = fed.server_lr, b1 = 0.9, b2 = 0.99 and tau = fed.server_tau.
+
 The server only ever sees weights, sample counts and scalar losses. It never sees a
 household's readings. That is data locality, NOT a formal privacy guarantee: model
 updates can still leak information. See the limitations in README.md.
@@ -53,13 +58,33 @@ class FederatedServer:
         self.precision = f.get("update_precision", "float32")
         self.ledger = CommLedger(self.num_params, self.precision)
         self.rng = np.random.default_rng(seed)
+        self.server_opt = f.get("server_optimizer") or "none"
+        if self.server_opt not in ("none", "adam"):
+            raise ValueError(f"unknown fed.server_optimizer {self.server_opt!r}")
+        self._m = self._v = None
+
+    def _server_step(self, global_w: list, avg_w: list) -> list:
+        if self.server_opt == "none":
+            return avg_w
+        f = self.cfg["fed"]
+        eta, tau, b1, b2 = float(f["server_lr"]), float(f.get("server_tau", 1e-3)), 0.9, 0.99
+        delta = [a.astype(np.float64) - g for a, g in zip(avg_w, global_w)]
+        if self._m is None:
+            self._m = [np.zeros_like(d) for d in delta]
+            self._v = [np.zeros_like(d) for d in delta]
+        out = []
+        for i, d in enumerate(delta):
+            self._m[i] = b1 * self._m[i] + (1 - b1) * d
+            self._v[i] = b2 * self._v[i] + (1 - b2) * d * d
+            out.append((global_w[i] + eta * self._m[i] / (np.sqrt(self._v[i]) + tau)).astype(np.float32))
+        return out
 
     def run(self):
         f = self.cfg["fed"]
         K = len(self.clients)
         n_sel = max(min(int(f.get("min_clients", 1)), K), math.ceil(float(f["client_fraction"]) * K))
         global_w = get_weights(self.model)
-        best = {"val_mae": float("inf"), "round": 0, "weights": copy.deepcopy(global_w)}
+        best = {"val_mae": float("inf"), "round": 0, "weights": copy.deepcopy(global_w), "cumulative_bytes": 0}
         history = []
         patience = f.get("patience_rounds")            # optional: stop after this many rounds without a
         patience = int(patience) if patience else None  # new best validation MAE (long-budget runs)
@@ -82,7 +107,7 @@ class FederatedServer:
             dissim = float("nan")
             if results:
                 dissim = update_dissimilarity(sent, results) if len(results) > 1 else 0.0
-                global_w = weighted_average(results)
+                global_w = self._server_step(global_w, weighted_average(results))
                 self.mu.update(dissim)
             set_weights(self.model, global_w)
             val, _, _ = evaluate_model(self.model, self.households, "val", self.device, self.cfg)

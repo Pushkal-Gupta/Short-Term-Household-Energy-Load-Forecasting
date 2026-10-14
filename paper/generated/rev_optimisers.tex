@@ -1,0 +1,16 @@
+\begin{tabular}{rlrrrrr}
+\toprule
+$K$ & Optimiser & Seeds & Best round & Test MAE & Gap (\%) & Early rise (\%) \\
+\midrule
+20 & Adam, reset each round & 3 & 96 & 0.0832 $\pm$ 0.0002 & +2.5 & 4.7 \\
+20 & Adam, state kept & 3 & 62 & 0.0838 $\pm$ 0.0007 & +3.2 & 5.1 \\
+20 & SGD & 3 & 7 & 0.0879 $\pm$ 0.0001 & +8.3 & 4.0 \\
+20 & FedAdam (server) & 3 & 23 & 0.0842 $\pm$ 0.0004 & +3.7 & 1.8 \\
+20 & FedAdam, step 0.03 (not selected) & 3 & 30 & 0.0829 $\pm$ 0.0002 & +2.1 & 27.1 \\
+100 & Adam, reset each round & 3 & 95 & 0.0871 $\pm$ 0.0004 & +7.3 & 1.0 \\
+100 & Adam, state kept & 3 & 71 & 0.0872 $\pm$ 0.0005 & +7.4 & 1.7 \\
+100 & SGD & 3 & 22 & 0.0897 $\pm$ 0.0007 & +10.4 & 2.3 \\
+100 & FedAdam (server) & 3 & 35 & 0.0855 $\pm$ 0.0007 & +5.3 & 24.7 \\
+100 & FedAdam, step 0.03 (not selected) & 3 & 30 & 0.0846 $\pm$ 0.0003 & +4.2 & 27.9 \\
+\bottomrule
+\end{tabular}

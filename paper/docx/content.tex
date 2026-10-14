@@ -7,23 +7,24 @@
 % Every number comes from generated/*.tex. Do not type results by hand.
 % Notation: t = half-hour, r = federated round, k = client, G = number of k-means profile clusters.
 
-\title{Fragmentation outweighs heterogeneity in the accuracy cost of federated household load forecasting}
+\title{Training budget and fragmentation, more than heterogeneity, drive the accuracy cost of federated household load forecasting}
 
 \begin{abstract}
-Federated learning (FL) is proposed for household load forecasting because meter readings stay at home. Its accuracy loss is usually blamed on differences between households, and its bandwidth advantage is
-assumed. This study separated heterogeneity, data fragmentation and training budget on 100 London households from the
-Low Carbon London trial, with fixed homes, test period and long short-term memory forecaster. The homes were split over
-1 to 100 clients in several ways, including a control that dealt training windows, not homes, to clients so that
-clients did not differ; heterogeneity was measured and every byte counted. With 30 rounds, the gap to centralised
-training grew from \RvHomeKfiveGap{}\,\% at five clients to \RvHomeKhundredGap{}\,\% with one home per client, and the
-control kept \RvWinKhundredShare{}\,\% of that gap. Measured heterogeneity added a smaller, significant cost; over the
-tested ranges, fragmentation accounted for about four times as much error. Training for up to 100 rounds narrowed the
-gap at 100 clients to \RvLongKhundredGap{}\,\% without closing it, and the pattern held in two further cohorts.
-Federated training moved more bytes than the raw readings in any encoding. With 20 clients of Dirichlet-mixed homes
-($\alpha=0.3$), federated averaging left \RvHarmFedModerateMargin{}\,\% of households more than 1\,\% worse off than
-local models, and local fine-tuning reduced this to \RvHarmFedModerateFTMargin{}\,\%. Without fine-tuning, federation
-was not significantly better than letting each client train alone on its pooled homes. Calendar inputs and proximal
-regularisation did not help. Federation here is a governance choice, not a bandwidth saving.
+Federated learning (FL) is proposed for household load forecasting because meter readings stay at home. Its accuracy loss
+is usually blamed on differences between households, and its bandwidth advantage is assumed. This study separated
+heterogeneity, data fragmentation and training budget on 100 London households from the Low Carbon London trial with a
+fixed one-step long short-term memory forecaster. The homes were split over 1 to 100 clients, including a control that
+dealt training windows, not homes, to clients so that clients did not differ. After 30 rounds, the gap to centralised
+training grew from \RvHomeKfiveGap{}\,\% at five clients to \RvHomeKhundredGap{}\,\% with one home per client, and with 20
+or more clients the control kept \RvCoShareBigLo{}--\RvCoShareBigHi{}\,\% of the gap in three cohorts. Training to a
+plateau, at up to \RvPlhomesKhundredMBtotal{}\,MB per run, shrank the gap to \RvPlHomeGapLo{}--\RvPlHomeGapHi{}\,\% for
+homes and \RvPlWinGapLo{}--\RvPlWinGapHi{}\,\% for the control: much of the cost was training budget, and part remained
+without heterogeneity. Over 100 rounds, server-side Adam narrowed the one-home-per-client gap from
+\RvOptAdamKonezerozeroGap{} to \RvOptFedAdamKonezerozeroGap{}\,\%; kept client optimiser state and client SGD did not
+help. With 20 or more clients, federated training moved more bytes than the raw readings in every encoding tested.
+With one home per client, federated averaging with local fine-tuning (\EonethreefedavghouseholdFT{}\,kWh mean absolute
+error) still lost to local models (\EonelocalMAE{}\,kWh). For one-step forecasts, federation here is a governance
+choice, not a bandwidth saving.
 \end{abstract}
 
 \section{Introduction}
@@ -46,20 +47,26 @@ varying only how the data are split. Three causes of the accuracy lost by FL are
 fragmentation of the data into many small clients, and the optimisation budget, since smaller clients take fewer local
 steps per round. Bandwidth claims rest on analytic estimates~\cite{taik2020,briggs2020ccai}. This paper separates these factors on \NumHouseholds{} homes of the Low Carbon
 London (LCL) trial~\cite{ukpn2015lcl}, with an independent and identically distributed (IID) control that fragments the
-data without making clients different, an extended training budget, and two further cohorts.
+data without making clients different, training to a plateau, three client and server optimisers, and two further
+cohorts.
 
 The principal contributions of this work are as follows:
 \begin{itemize}
-\item A controlled decomposition of the federated--centralised gap with an IID control and an extended budget, showing
-that most of the gap is a cost of fragmenting the data: clients that did not differ kept \RvWinShareLo{}--\RvWinShareHi{}\,\%
-of it, while measured heterogeneity added a smaller, significant share and longer training narrowed but did not close it.
+\item A controlled decomposition of the federated--centralised gap with an IID control trained to a plateau, showing
+that most of the gap after a fixed budget is a cost of fragmenting the data and of the budget itself: with 20 or more
+clients, clients that did not differ kept \RvWinShareLo{}--\RvWinShareHi{}\,\% of the 30-round gap
+(\RvWinKfiveShare{}\,\% at $K=5$), training to a plateau removed much but not all of it, and measured heterogeneity
+added a smaller share.
 \item A byte ledger of federated training against four encodings of the raw readings, showing that federation of a
-small LSTM moves more data than it keeps local, and that the traffic effect of heterogeneity is small and depends on the
+small LSTM with 20 or more clients moves more data than it keeps local, and that the traffic effect of heterogeneity is small and depends on the
 threshold used to measure it.
 \item A household-level analysis of who loses from federation, with a 1\,\% margin and a client-only baseline,
-showing that federation between community hubs pays off only with local fine-tuning, which also removes most of the
-harm to individual homes.
-\item Negative results for calendar inputs and for proximal regularisation, whose validation-tuned coefficient was zero.
+showing that federation between community hubs improves on client-only training, if at all, only with local fine-tuning
+(consistently across seeds but not significantly after correction), which lowers the share of harmed
+homes from \RvHarmFedModerateMargin{} to \RvHarmFedModerateFTMargin{}\,\% at $K=20$ and from \RvHarmFedKonezerozeroMargin{}
+to \RvHarmFedKonezerozeroFTMargin{}\,\% at $K=100$ without removing it.
+\item Negative results for calendar inputs, for proximal regularisation, whose validation-tuned coefficient was zero, and
+for client-side optimiser changes, against a partial gain from a server-side adaptive optimiser.
 \end{itemize}
 
 \section{Literature Review}
@@ -72,14 +79,21 @@ clustering reducing the shortfall to 4.7\,\% and local fine-tuning reversing it;
 model was 4.8\,\% worse than localised learning. Gholizadeh and Musilek~\cite{gholizadeh2022} also found local
 learning best on average, whereas Fekri et al.~\cite{fekri2022} found FedAvg comparable to, or better than, per-meter
 models on 19 homes. Personalised and clustered variants~\cite{qu2023,widmer2023,dogra2023,das2026,lu2024fds} are almost
-always motivated by household heterogeneity.
+always motivated by household heterogeneity, and recent work continues in that direction with shared encoders~\cite{zhu2025pfholo},
+meta-learning with control variates~\cite{feng2025fmaml}, adaptive or metaheuristic
+aggregation~\cite{abdulla2024,sarantinopoulos2025}, fairness between participants~\cite{wang2025mgdflp}, personalised
+building models~\cite{wang2024pflbuildings,dissem2025} and secure or attack-tolerant training~\cite{husnoo2024,mostafanezhad2025}.
+A recent benchmark found that once every household fine-tunes the shared model, clustering and personalisation end within
+2\,\% of each other, with clustering needing about a third of the rounds~\cite{zheng2026benchmark}.
 
 \subsection{Communication cost of federation}
 Communication efficiency was a founding motivation of FL~\cite{mcmahan2017fedavg,konecny2016comm}, but for load
 forecasting the evidence points both ways. Taïk and Cherkaoui~\cite{taik2020} estimated analytically that FL saves
 90--97\,\% of the network load of uploading data, and Savi and Olivadese~\cite{savi2021} reported up to 50 times less
 exchanged data, whereas Briggs et al.~\cite{briggs2020ccai} argued without measurement that weight vectors cost more
-than half-hourly readings on smart-meter links.
+than half-hourly readings on smart-meter links. The advantage reported by Savi and Olivadese was tied to sampling finer
+than one hour, and both savings figures compare a model with the data volume rather than counting the bytes of a
+training run.
 
 \subsection{Non-IID data, local steps and proximal regularisation}
 Statistical heterogeneity slows and biases FedAvg~\cite{zhao2018noniid,kairouz2021advances}. Remedies include proximal
@@ -114,8 +128,11 @@ weights $w_r$ to a set of clients, each trains for $E$ local epochs, and the ret
 \begin{equation}\label{eq:fedavg}
 w_{r+1}=\sum_{k\in S_r'}p_k w_k,\qquad p_k=\frac{n_k}{\sum_{j\in S_r'}n_j},
 \end{equation}
-where $n_k$ is the number of training windows of client $k$~\cite{mcmahan2017fedavg}. Clients are stateless: each local
-update starts a fresh Adam optimiser from $w_r$, so no optimiser moments are carried between rounds.
+where $n_k$ is the number of training windows of client $k$~\cite{mcmahan2017fedavg}. By default clients are
+stateless: each local update starts a fresh Adam optimiser from $w_r$. Three alternatives were tested: client Adam
+state kept across rounds, plain client stochastic gradient descent (SGD), and FedAdam~\cite{reddi2021fedopt}, which
+applies Adam on the server to the averaged update $\sum_k p_k w_k-w_r$ ($\beta_1=0.9$, $\beta_2=0.99$,
+$\tau=10^{-3}$). The SGD and server step sizes were chosen on validation MAE (Supplementary Table S7).
 
 \subsection{Data}
 The public LCL release~\cite{ukpn2015lcl} contains half-hourly consumption of 5{,}567 London households. For calendar
@@ -147,8 +164,8 @@ weights; $P\cdot b$: bytes per message; FT: local fine-tuning.}\label{fig:workfl
 
 With one home per client, $K=100$. Otherwise the same homes were grouped into $K$ equal-sized clients of $100/K$
 homes, as behind a building gateway or community energy hub. Each household was described by its normalised daily
-load shape and log mean load and clustered with $k$-means into $G=5$ profile clusters. Five groupings of homes were
-used. \emph{Random} grouping permuted the homes and cut the permutation into $K$ blocks. \emph{Dirichlet} grouping
+load shape and log mean load and clustered with $k$-means into $G=5$ profile clusters. Four groupings of homes were
+used, together with one control. \emph{Random} grouping permuted the homes and cut the permutation into $K$ blocks. \emph{Dirichlet} grouping
 drew for each client a mixture $\pi\sim\mathrm{Dir}(\alpha\mathbf{1}_G)$ and filled each of its slots with a random home
 from a cluster drawn from $\pi$, renormalised over clusters with homes left~\cite{hsu2019dirichlet}. \emph{Cluster}
 grouping sorted homes by cluster and mean load and cut the list into blocks. \emph{Shape} grouping sorted homes by the
@@ -170,8 +187,9 @@ composite would be dominated by the level term (it made up \RvHcvShare{}\,\% of 
 
 \textbf{Communication.} A message carries $P\cdot b$ bytes ($b=4$ for 32-bit, 2 for 16-bit updates), with one
 download per selected client and one upload per returning client; framing headers are excluded. With $v_r$ the
-validation MAE after round $r$ and $v^\star$ that of centralised training, R@$\varepsilon$ is the first round with
-$v_r\le(1+\varepsilon)v^\star$ and B@$\varepsilon$ the bytes exchanged up to it, for
+validation MAE after round $r$ and $v^\star$ that of centralised training, R@$\varepsilon$ is the first round after
+which $v_r\le(1+\varepsilon)v^\star$ held for every remaining round of the run, so that a transient dip does not
+count, and B@$\varepsilon$ the bytes exchanged up to it, for
 $\varepsilon\in\{5,10,15,20\}\,\%$. Because any single threshold is arbitrary, the mean excess
 $\frac{1}{30}\sum_r(v_r/v^\star-1)$ over the first 30 rounds was also reported. The raw-data volume was counted for
 four encodings: 2- and 4-byte readings, a 12-byte reading with a 4-byte timestamp offset and a 4-byte household index
@@ -183,50 +201,47 @@ The default federated setting used $K=20$, full participation and $R=30$ rounds 
 passes over the data as the centralised budget. The experiments varied $K$ (1, 5, 20, 50, 100), the grouping (window,
 random, $\alpha\in\{1,0.3,0.1\}$, cluster and shape), participation ($C=0.5$ with stragglers), the aggregation rule and
 16-bit updates. The local budget per round shrinks with $K$: a client took \RvStepsKone{} Adam steps per round at $K=1$,
-\RvStepsKtwenty{} at $K=20$ and \RvStepsKhundred{} at $K=100$. FedAvg at $K=20$, 50 and 100 was therefore rerun for up
-to 100 rounds, stopped after 25 rounds without a new best validation MAE. Two further checks addressed the forecaster:
+\RvStepsKtwenty{} at $K=20$ and \RvStepsKhundred{} at $K=100$. FedAvg with homes and with the window control was
+therefore also trained to a plateau at $K=20$, 50 and 100: up to 500 rounds, stopped after 50 rounds without a new best
+validation MAE. The optimisers were compared at $K=20$ and 100 over 100 rounds, stopped after 25 rounds without
+improvement. Two further checks addressed the forecaster:
 sine and cosine encodings of time of day and day of week as extra inputs, and the mean absolute scaled error (MASE),
 scaled per household by the in-sample one-step naive MAE on its training data. Each configuration ran with three seeds;
-the heterogeneity, participation and precision configurations ran with five. A seed fixed the model initialisation, the
+the arms in the main comparisons and the heterogeneity, participation and precision configurations ran with five. A seed fixed the model initialisation, the
 random grouping or Dirichlet draw, client sampling and stragglers, and the order of mini-batches; the cohort was fixed.
 The proximal coefficients were tuned on validation data over $\mu\in\{0,10^{-4},10^{-3},10^{-2},10^{-1}\}$.
 The pipeline used Python 3.14.7, PyTorch 2.14.1 and an in-process simulator whose clients follow the Flower interface;
 Flower 1.39.0~\cite{beutel2020flower} reproduced its results exactly.
 
 Accuracy was measured by MAE, RMSE and weighted absolute percentage error (WAPE), micro-averaged over all test
-half-hours, and by MASE. For paired tests, each household's MAE was first averaged over seeds; arms were then compared
-with Wilcoxon signed-rank tests over the 100 households~\cite{wilcoxon1945}, with Holm correction~\cite{holm1979}
-applied over the whole family of comparisons in Supplementary Table S1. A household was counted as harmed by an arm if
-its MAE was more than 1\,\% above its local-only MAE. Results with $p_{\mathrm{Holm}}\ge0.05$ are described as not
-significant, without implying equivalence.
+half-hours, and by MASE. Households scored by one trained model are not independent, so the training run was the unit
+of replication: arms were compared on the pooled test MAE of each run, paired by seed where both had the same seeds
+(paired $t$-test) and with Welch's test otherwise. With every household in every run this is equivalent to testing the
+arm in a linear mixed model with crossed random effects for household and run. One family of \RvTsFamily{} comparisons
+(Supplementary Table S1) was corrected with Holm's method~\cite{holm1979}, and every $p$-value in the text is this
+corrected value unless marked otherwise; differences $\Delta$ are given in $10^{-4}$\,kWh with 95\,\% confidence
+intervals. The share of households that did better under an arm is descriptive only. A household was counted as harmed
+by an arm if its MAE was more than 1\,\% above its local-only MAE. Results with $p_{\mathrm{Holm}}\ge0.05$ are described
+as not significant, without implying equivalence.
 
 \section{Results}
 
 \subsection{Main arms}
 Table~\ref{tab:main} gives the test error of the main arms. Centralised training was the most accurate arm, better than
-persistence by \RvCentralVsPersist{}\,\% in MAE, and better than local-only training for
-\StEtwocentralizedvsEonelocalBetter{}\,\% of households ($p_{\mathrm{Holm}}$ \pv{\StEtwocentralizedvsEonelocalP}).
+persistence by \RvCentralVsPersist{}\,\% in MAE, and better than local-only training in \RvTsCenLocSeeds{} paired seeds
+($\Delta=\RvTsCenLocDiff{}$, 95\,\% CI \RvTsCenLocLo{} to \RvTsCenLocHi{}, $p_{\mathrm{Holm}}$\,\RvTsCenLocP{}) and for
+\RvTsCenLocHH{}\,\% of households.
 Not every federated arm beat the naive references: with one home per client, FedAvg was slightly worse than persistence
 in MAE (\EonethreefedavghouseholdMAE{} against \PersistenceMAE{}\,kWh), although better in RMSE. As a sanity check of
 the federated implementation, running it on a single client holding all homes ($K=1$) reproduced centralised accuracy
-($p_{\mathrm{Holm}}$ \pv{\StEonefourfedavgKonevsEtwocentralizedP}).
+($\Delta=\RvTsKoneCenDiff{}$, CI \RvTsKoneCenLo{} to \RvTsKoneCenHi{}).
 
-
-\subsection{Fragmentation and training budget}
-The gap to centralised training appeared as soon as the homes were split and grew with the number of clients
-(Fig.~\ref{fig:frag} and Table~\ref{tab:frag}), from \RvHomeKfiveGap{}\,\% at $K=5$ to \RvHomeKtwentyGap{}\,\% at $K=20$,
-\RvHomeKfiftyGap{}\,\% at $K=50$ and \RvHomeKhundredGap{}\,\% with one home per client. Under random grouping, however,
-splitting also makes clients more different: $H_{\mathrm{JS}}$ rose from \RvHJSHomeKfive{} at $K=5$ to
-\RvHJSHomeKhundred{} at $K=100$, because a smaller client averages over fewer homes. The window control removed this
-confound. With windows dealt at random, $H_{\mathrm{JS}}$ stayed at or below \RvWinKhundredHJS{} (the residual is the
-sampling noise of finite shards) and client mean loads were equal, yet the gap remained \RvWinKfiveGap{}, \RvWinKtwentyGap{},
-\RvWinKfiftyGap{} and \RvWinKhundredGap{}\,\% at $K=5$, 20, 50 and 100, that is \RvWinShareLo{}--\RvWinShareHi{}\,\%
-of the gap with homes at $K\ge20$.
 
 \begin{table}
 \caption{Test error of the main arms (kWh per half-hour; MAE as mean $\pm$ s.d. over seeds). Gap: MAE relative to
 centralised training. Traffic: upload plus download over 30 rounds; for centralised training, the raw training data at
-12 bytes per reading. FT: after one epoch of local fine-tuning.}\label{tab:main}
+12 bytes per reading. FT: after one epoch of local fine-tuning on each home. Client-only: each client trains alone on
+its homes.}\label{tab:main}
 \begin{tabular}{lrrrrrrr}
 Arm & $K$ & MAE & RMSE & WAPE (\%) & Gap (\%) & MAE, FT & Traffic (MB) \\
 Persistence & -- & \PersistenceMAE{} & \PersistenceRMSE{} & \RvPersistenceWAPE{} & -- & -- & 0 \\
@@ -234,6 +249,8 @@ Seasonal naive & -- & \SeasonalNaiveMAE{} & \SeasonalNaiveRMSE{} & \RvSeasonalNa
 Local-only & -- & \EonelocalMAE{} $\pm$ \EonelocalMAEsd{} & \EonelocalRMSE{} & \EonelocalWAPE{} & \EonelocalGap{} & -- & 0 \\
 Centralised & -- & \EtwocentralizedMAE{} $\pm$ \EtwocentralizedMAEsd{} & \EtwocentralizedRMSE{} & \EtwocentralizedWAPE{} & 0.0 & -- & \EtwocentralizedMB{} \\
 FedAvg, sanity check & 1 & \EonefourfedavgKoneMAE{} $\pm$ \EonefourfedavgKoneMAEsd{} & \EonefourfedavgKoneRMSE{} & \EonefourfedavgKoneWAPE{} & \EonefourfedavgKoneGap{} & \EonefourfedavgKoneFT{} & \EonefourfedavgKoneMB{} \\
+Client-only & 5 & \RvCliFTKfiveMAE{} $\pm$ \RvCliFTKfiveMAEsd{} & \RvCliFTKfiveRMSE{} & \RvCliFTKfiveWAPE{} & \RvCliFTKfiveGap{} & \RvCliFTKfiveFT{} & 0 \\
+Client-only & 20 & \RvCliFTKtwentyMAE{} $\pm$ \RvCliFTKtwentyMAEsd{} & \RvCliFTKtwentyRMSE{} & \RvCliFTKtwentyWAPE{} & \RvCliFTKtwentyGap{} & \RvCliFTKtwentyFT{} & 0 \\
 FedAvg, random & 5 & \EonefourfedavgKfiveMAE{} $\pm$ \EonefourfedavgKfiveMAEsd{} & \EonefourfedavgKfiveRMSE{} & \EonefourfedavgKfiveWAPE{} & \EonefourfedavgKfiveGap{} & \EonefourfedavgKfiveFT{} & \EonefourfedavgKfiveMB{} \\
 FedAvg, random & 20 & \EthreefedavgiidMAE{} $\pm$ \EthreefedavgiidMAEsd{} & \EthreefedavgiidRMSE{} & \EthreefedavgiidWAPE{} & \EthreefedavgiidGap{} & \EthreefedavgiidFT{} & \EthreefedavgiidMB{} \\
 FedAvg, random & 50 & \EonefourfedavgKfivezeroMAE{} $\pm$ \EonefourfedavgKfivezeroMAEsd{} & \EonefourfedavgKfivezeroRMSE{} & \EonefourfedavgKfivezeroWAPE{} & \EonefourfedavgKfivezeroGap{} & \EonefourfedavgKfivezeroFT{} & \EonefourfedavgKfivezeroMB{} \\
@@ -245,125 +262,221 @@ FedAvg, $\alpha=0.3$, 16-bit & 20 & \EonetwofedavgfponesixmoderateMAE{} $\pm$ \E
 \end{tabular}
 \end{table}
 
-A regression of run-level test MAE on $\ln K$ and $H_{\mathrm{JS}}$ over all FedAvg runs with random, Dirichlet, cluster
-and window partitions ($n=\RvRegN{}$, $R^2=\RvRegRtwo{}$) gave $\RvRegLogK{}\times10^{-3}$\,kWh per unit of $\ln K$ (95\,\%
-CI \RvRegLogKlo{} to \RvRegLogKhi{}, $p$ \RvRegLogKP{}) and $\RvRegHJS{}\times10^{-3}$\,kWh per unit of $H_{\mathrm{JS}}$
-(95\,\% CI \RvRegHJSlo{} to \RvRegHJShi{}, $p$ \RvRegHJSP{}). Both terms matter, but over the ranges tested going from five
-to 100 clients corresponds to \RvRegEffK{}\,kWh, whereas the whole range of $H_{\mathrm{JS}}$ obtained at $K=20$
-(\RvRegHJSRangeLo{} to \RvRegHJSRangeHi{}) corresponds to \RvRegEffH{}\,kWh.
+\subsection{Fragmentation and training budget}
+The gap to centralised training appeared as soon as the homes were split and grew with the number of clients
+(Table~\ref{tab:frag}), from \RvHomeKfiveGap{}\,\% at $K=5$ to \RvHomeKtwentyGap{}\,\% at $K=20$,
+\RvHomeKfiftyGap{}\,\% at $K=50$ and \RvHomeKhundredGap{}\,\% with one home per client after 30 rounds; at run level the
+gaps at $K=20$ ($\Delta=\RvTsKtwentyCenDiff{}$, $p_{\mathrm{Holm}}$\,\RvTsKtwentyCenP{}) and $K=100$
+($\Delta=\RvTsKhundredCenDiff{}$, $p_{\mathrm{Holm}}$\,\RvTsKhundredCenP{}) were significant. Under random
+grouping, however, splitting also makes clients more different: $H_{\mathrm{JS}}$ rose from \RvHJSHomeKfive{} at $K=5$ to
+\RvHJSHomeKhundred{} at $K=100$, because a smaller client averages over fewer homes. The window control removed this
+confound. With windows dealt at random, $H_{\mathrm{JS}}$ stayed at or below \RvWinKhundredHJS{} (the sampling noise of
+finite shards) and client mean loads were equal, yet the gap remained \RvWinKfiveGap{}, \RvWinKtwentyGap{},
+\RvWinKfiftyGap{} and \RvWinKhundredGap{}\,\% at $K=5$, 20, 50 and 100, that is \RvWinShareLo{}--\RvWinShareHi{}\,\% of
+the gap with homes at $K\ge20$ and \RvWinKfiveShare{}\,\% at $K=5$ (shares from unrounded gaps). At run level the
+windows were better than homes by $\Delta=\RvTsWinHomeKtwentyDiff{}$ at $K=20$ and \RvTsWinHomeKhundredDiff{} at
+$K=100$, neither significant ($p_{\mathrm{Holm}}$\,\RvTsWinHomeKtwentyP{} and \RvTsWinHomeKhundredP{}).
+
+A regression of run-level test MAE on $\ln K$, $H_{\mathrm{JS}}$ and an indicator for groupings of homes, over all FedAvg
+runs with random, Dirichlet, cluster, shape and window partitions ($n=\RvRegTwoN{}$), gave $\RvRegTwolnK{}\times10^{-3}$\,kWh
+per unit of $\ln K$ (95\,\% CI \RvRegTwolnKlo{} to \RvRegTwolnKhi{}, $p$\,\RvRegTwolnKP{}),
+$\RvRegTwoHJS{}\times10^{-3}$\,kWh per unit of $H_{\mathrm{JS}}$ (CI \RvRegTwoHJSlo{} to \RvRegTwoHJShi{}, $p$\,\RvRegTwoHJSP{})
+and $\RvRegTwohomes{}\times10^{-3}$\,kWh for homes rather than windows (CI \RvRegTwohomeslo{} to \RvRegTwohomeshi{},
+$p$\,\RvRegTwohomesP{}; uncorrected). Among groupings of homes $\ln K$ and $H_{\mathrm{JS}}$ were correlated
+($r=\RvRegCorrKH{}$), so the pooled fit cannot fully separate them; within $K=20$ alone, the $H_{\mathrm{JS}}$ term was
+$\RvRegKtHJS{}\times10^{-3}$\,kWh (CI \RvRegKtHJSlo{} to \RvRegKtHJShi{}, $n=\RvRegKtN{}$). Over the ranges tested,
+going from five to 100 clients corresponds to \RvRegEffK{}\,kWh, whereas the whole range of $H_{\mathrm{JS}}$ obtained
+at $K=20$ (\RvRegHJSRangeLo{} to \RvRegHJSRangeHi{}) corresponds to \RvRegEffH{}\,kWh.
+
+\begin{table}
+\caption{Fragmentation with and without heterogeneity (FedAvg). Homes: homes grouped at random; windows: training
+windows dealt at random to equal shards (IID control). Gap: test MAE relative to centralised training after 30 rounds,
+and at the plateau (up to 500 rounds, stopped after 50 rounds without improvement). Share: part of the 30-round
+gap kept by the control, from unrounded gaps.}\label{tab:frag}
+\input{generated/rev_window.tex}
+\end{table}
 
 Part of the fragmentation cost is a budget cost. With one local epoch per round, a client took \RvStepsKone{} Adam steps
 per round at $K=1$ but only \RvStepsKhundred{} at $K=100$, and the round selected on validation moved towards the end of
-the 30 rounds as $K$ grew (Supplementary Table S2). Allowing up to 100 rounds narrowed the gap to \RvLongKtwentyGap{}\,\%
-at $K=20$, \RvLongKfiftyGap{}\,\% at $K=50$ and \RvLongKhundredGap{}\,\% at $K=100$. The $K=50$ runs had stopped
-improving (best round \RvLongKfiftyBest{}, stopped at \RvLongKfiftyRun{}), but at $K=20$ and $K=100$ the best round was
-still near the end (\RvLongKtwentyBest{} and \RvLongKhundredBest{} of 100), so these gaps are upper bounds for longer
-training.
-
-
-\begin{table}
-\caption{Fragmentation with and without heterogeneity (FedAvg, 30 rounds). Homes: homes grouped at random; windows:
-training windows dealt at random to equal shards. Gap: test MAE relative to centralised training.}\label{tab:frag}
-\input{generated/rev_window.tex}
-\end{table}
+the 30 rounds as $K$ grew (Supplementary Table S2 and Fig.~S1). Trained to a plateau (Figs.~\ref{fig:frag} and
+\ref{fig:plateau}), the gap
+fell to \RvPlhomesKtwentyGap{}, \RvPlhomesKfiftyGap{} and \RvPlhomesKhundredGap{}\,\% with homes and to
+\RvPlwindowsKtwentyGap{}, \RvPlwindowsKfiftyGap{} and \RvPlwindowsKhundredGap{}\,\% with windows at $K=20$, 50 and 100.
+More rounds thus removed \RvPlRemovedLo{}--\RvPlRemovedHi{}\,\% of the 30-round gap with homes, but the IID control did
+not close: identical clients still kept \RvPlShareLo{}--\RvPlShareHi{}\,\% of the gap with homes. The best rounds per seed were \RvPlhomesKtwentyBest{}
+($K=20$), \RvPlhomesKfiftyBest{} ($K=50$) and \RvPlhomesKhundredBest{} ($K=100$) with homes, and
+\RvPlwindowsKtwentyBest{} ($K=20$), \RvPlwindowsKfiftyBest{} ($K=50$) and \RvPlwindowsKhundredBest{} ($K=100$) with windows (Supplementary Table S5).
+All runs but one stopped after 50 rounds without improvement; one $K=100$ run with homes was still improving at the
+500-round cap, so that gap is an upper bound. At $K=20$ and 100 every plateau run, with homes or windows, remained less accurate than
+centralised training of the same seed, but with three seeds per arm the plateau differences between homes and windows ($\Delta=\RvTsPlWinHomeKtwentyDiff{}$ to
+\RvTsPlWinHomeKhundredDiff{}) were not significant after correction. Reaching the plateau was expensive: a $K=100$ run
+moved \RvPlhomesKhundredMBbest{}\,MB up to its best round and \RvPlhomesKhundredMBtotal{}\,MB in all, against
+\EonethreefedavghouseholdMB{}\,MB for 30 rounds; the 100-round runs of the first revision moved \RvLongKtwentyMB{},
+\RvLongKfiftyMB{} and \RvLongKhundredMB{}\,MB at $K=20$, 50 and 100.
 
 \begin{figure}
 \includegraphics[width=0.52]{revision_window.png}
 \caption{Test MAE (kWh) when the same 100 households are split over $K$ clients (mean $\pm$ s.d. over seeds). Circles:
-homes grouped at random, 30 rounds; squares: training windows dealt at random (IID control), 30 rounds; triangles:
-homes grouped at random, up to 100 rounds. Dotted: centralised.}\label{fig:frag}
+homes grouped at random and squares: training windows dealt at random (IID control), both after 30 rounds; filled
+triangles and diamonds: the same at the plateau. Dotted: centralised.}\label{fig:frag}
 \end{figure}
+
+\begin{figure}
+\includegraphics[width=0.95]{revision_plateau.png}
+\caption{FedAvg trained to a plateau (mean over three seeds, plotted while every seed was running). (a) Validation MAE
+against rounds and (b) against megabytes exchanged. Solid: homes grouped at random; dashed: training windows dealt at
+random (IID control). Dotted: centralised.}\label{fig:plateau}
+\end{figure}
+
+\subsection{Optimiser set-up}
+Restarting Adam in every round is a design choice, so the 100-round runs at $K=20$ and $K=100$ were repeated with
+three alternatives (Supplementary Table S6). Keeping the client Adam state gave a test MAE of
+\RvOptAdamKeepKtwozeroMAE{} against \RvOptAdamKtwozeroMAE{}\,kWh at $K=20$ ($\Delta=\RvTsKeepKtwentyDiff{}$,
+$p_{\mathrm{Holm}}$\,\RvTsKeepKtwentyP{}) and \RvOptAdamKeepKonezerozeroMAE{} against \RvOptAdamKonezerozeroMAE{}\,kWh at
+$K=100$ ($\Delta=\RvTsKeepKhundredDiff{}$, $p_{\mathrm{Holm}}$\,\RvTsKeepKhundredP{}). Client SGD with the step size
+chosen on validation (\RvGridsgdBest{}) reached \RvOptSGDKtwozeroMAE{} and \RvOptSGDKonezerozeroMAE{}\,kWh, and FedAdam
+with server step size \RvGridfedadamBest{} reached \RvOptFedAdamKtwozeroMAE{} and \RvOptFedAdamKonezerozeroMAE{}\,kWh
+($\Delta=\RvTsFedAdamKtwentyDiff{}$ and \RvTsFedAdamKhundredDiff{} against Adam with restarts). Keeping the
+optimiser state therefore made no difference, and client SGD was worse at both sizes, significantly so at $K=20$
+($p_{\mathrm{Holm}}$\,\RvTsSgdKtwentyP{}). FedAdam did not help at $K=20$, but with one home per client it narrowed the
+gap from \RvOptAdamKonezerozeroGap{} to \RvOptFedAdamKonezerozeroGap{}\,\% in \RvTsFedAdamKhundredSeeds{} paired seeds,
+selecting its model by round \RvOptFedAdamKonezerozeroBest{} on average, about as close as plain FedAvg came after
+hundreds of rounds (\RvPlhomesKhundredGap{}\,\% at the plateau); the difference was not significant with three seeds ($p_{\mathrm{Holm}}$\,\RvTsFedAdamKhundredP{}).
+The step size 0.03, run because 0.01 lay at the edge of the grid and almost tied with it on validation, gave
+\RvOptFedAdamOtherKonezerozeroGap{}\,\% at $K=100$ and \RvOptFedAdamOtherKtwozeroGap{}\,\% at $K=20$; it is reported but
+was not selected. A server-side adaptive optimiser thus recovers part of the budget cost of meter-level federation, but
+no optimiser closed the gap.
 
 \subsection{Heterogeneity at a fixed number of clients}
 At $K=20$, grouping the homes from random to cluster almost doubled $H_{\mathrm{JS}}$ (Table~\ref{tab:het}), and
 cluster grouping also raised the spread of client mean load. Final test error hardly moved: across the groupings of
-homes it stayed within \RvHetMaxDiff{}\,kWh, the 95\,\% intervals overlapped, and the rank correlation between
-$H_{\mathrm{JS}}$ and test MAE over runs was \RvHetSpearman{} ($p$ \RvHetSpearmanP{}, $n=\RvHetSpearmanN{}$). Per
-household, cluster grouping was not significantly different from random grouping ($p_{\mathrm{Holm}}$
-\pv{\StEsixfedavgstrongvsEthreefedavgiidP}). The window control was the most accurate grouping
-(\RvHetwindowMAE{}\,kWh), consistent with the small heterogeneity term of the regression. Sorting homes by load shape gave the largest divergence
-($H_{\mathrm{JS}}=\RvHetshapesortedHJS{}$) and the same error (\RvHetshapesortedMAE{}\,kWh), so the absence of an effect
-is not an artefact of the cluster definition; it does, however, hold only over the narrow range of heterogeneity
-that equal-sized clients of these homes allow.
+homes it ranged from \RvHetMaeLo{} to \RvHetMaeHi{}\,kWh, the 95\,\% intervals overlapped, and the rank correlation between
+$H_{\mathrm{JS}}$ and test MAE over runs was \RvHetSpearman{} ($p$\,\RvHetSpearmanP{}, uncorrected, $n=\RvHetSpearmanN{}$).
+Cluster grouping did not differ significantly from random grouping ($\Delta=\RvTsCluRndDiff{}$, CI \RvTsCluRndLo{} to
+\RvTsCluRndHi{}, $p_{\mathrm{Holm}}$\,\RvTsCluRndP{}). The window control was the most accurate grouping
+(\RvHetwindowMAE{}\,kWh). Sorting homes by load shape gave the largest divergence ($H_{\mathrm{JS}}=\RvHetshapesortedHJS{}$)
+and the same error (\RvHetshapesortedMAE{}\,kWh), so the absence of an effect is not an artefact of the cluster
+definition; it holds, however, only over the narrow range of heterogeneity that equal-sized clients of these homes allow.
 
-The traffic needed to approach centralised accuracy depended more on the threshold and the seed than on the grouping
-(Fig.~\ref{fig:het}). Within 15 or 20\,\% of centralised validation error, every run of every grouping qualified after the
-first round (\RvHetrandomBonefive{}\,MB). Within 10\,\%, cluster grouping needed \RvHetBepsIncrease{}\,\% more traffic than random grouping
-on average over five seeds, but the IID control needed more than random grouping too (\RvHetwindowBonezero{} against
-\RvHetrandomBonezero{}\,MB), so this difference is within seed variation. Within 5\,\%, many runs never qualified in 30
-rounds. The threshold-free excess error over the first 30 rounds rose steadily but modestly, from \RvHetwindowExcess{}\,\%
-for the window control and \RvHetrandomExcess{}\,\% for random grouping to \RvHetclusterExcess{}\,\%, so heterogeneity
-slowed FedAvg slightly. These traffic results concern FedAvg; the proximal variants converged differently
-(Supplementary Section S3).
+Heterogeneity showed up early in training rather than at the end. After the first round, validation error rose for a
+few rounds before falling (Fig.~\ref{fig:het}a): the largest rise above its running minimum in the first ten rounds was
+\RvRisewindow{}\,\% for the window control and \RvRiseHomeLo{}--\RvRiseHomeHi{}\,\% for groupings of homes. In the same
+rounds the client updates disagreed far more when clients held different homes (mean normalised disagreement over
+rounds 2--5 of \RvRhoEarlyHomeLo{}--\RvRhoEarlyHomeHi{}, against \RvRhoEarlywindow{} for the control; Supplementary
+Eq.~S1): each client's first epochs pull the shared model towards its own profiles, and the average of these divergent
+models is temporarily worse. Restarting Adam each round did not cause the rise: with the optimiser state kept, it was
+\RvOptAdamKeepKtwozeroRise{}\,\% at $K=20$, against \RvOptAdamKtwozeroRise{}\,\% with restarts over the same seeds.
+
+The traffic needed to settle near centralised accuracy depended more on the threshold and the seed than on the grouping
+(Fig.~\ref{fig:het}b). Within 20\,\%, the control settled after the first round in every seed
+(\RvHetwindowBtwozero{}\,MB), whereas seeds of the groupings of homes needed between \RvHetrandomBtwozeroLo{} and
+\RvHetclusterBtwozeroHi{}\,MB. Within 10\,\%, the control needed the least traffic on average
+(\RvHetwindowBonezero{}\,MB; \RvHetwindowBonezeroLo{}--\RvHetwindowBonezeroHi{}\,MB over seeds). Among groupings of homes the means ranged from
+\RvHetshapesortedBonezero{}\,MB for shape-sorted grouping, the most divergent, to \RvHetclusterBonezero{}\,MB for cluster
+grouping, with random grouping at \RvHetrandomBonezero{}\,MB, and their seed ranges overlapped widely (random
+\RvHetrandomBonezeroLo{}--\RvHetrandomBonezeroHi{}, cluster \RvHetclusterBonezeroLo{}--\RvHetclusterBonezeroHi{}\,MB), so
+traffic did not follow $H_{\mathrm{JS}}$. Within 5\,\%, \RvHetwindowBfiveN{} of \RvHetwindowN{} control runs settled within 30 rounds, against
+\RvHetazerothreeBfiveN{} run at $\alpha=0.3$, \RvHetazerooneBfiveN{} at $\alpha=0.1$ and none with the other groupings of
+homes, all of them near the end of the 30 rounds. The threshold-free excess error over the
+first 30 rounds was \RvHetwindowExcess{}\,\% for the control and \RvHetExcessHomeLo{}--\RvHetExcessHomeHi{}\,\% for the
+groupings of homes, not ordered by $H_{\mathrm{JS}}$: heterogeneity slowed FedAvg slightly, without a dose--response
+over this range. These results concern FedAvg; the proximal variants converged differently (Supplementary Section S3).
 
 \begin{figure}
 \includegraphics[width=0.82]{revision_heterogeneity.png}
 \caption{Groupings of the same homes into $K=20$ clients (FedAvg). (a) Validation MAE per round (mean $\pm$ s.d. over
-seeds; dotted: centralised). (b) Megabytes exchanged before validation MAE first came within $\varepsilon$ of
-centralised, for four thresholds; dots are seeds, crosses mark seeds that never reached the threshold.}\label{fig:het}
+seeds; dotted: centralised). (b) Megabytes exchanged up to the round after which validation MAE stayed within
+$\varepsilon$ of centralised for the rest of the 30 rounds, for four thresholds; dots are seeds, crosses mark seeds that
+never settled (a run that qualifies only in its last round counts as not settled).}\label{fig:het}
 \end{figure}
 
 \begin{table}
-\caption{Groupings of the same homes into $K=20$ clients (FedAvg). $H_{\mathrm{JS}}$: load-shape divergence (base 2);
-$H_{\mathrm{CV}}$: variation of client mean load; test MAE with 95\,\% confidence interval over seeds; B@$\varepsilon$:
-megabytes exchanged before validation MAE first came within $\varepsilon$ of centralised, averaged over the seeds that
-reached it (in brackets); Excess: mean validation error above centralised over the first 30 rounds.}\label{tab:het}
+\caption{Groupings of the same homes into $K=20$ clients (FedAvg, 30 rounds). $H_{\mathrm{JS}}$: load-shape divergence
+(base 2); $H_{\mathrm{CV}}$: variation of client mean load; test MAE with 95\,\% confidence interval over seeds;
+B@$\varepsilon$: megabytes exchanged up to the round after which validation MAE stayed within $\varepsilon$ of
+centralised, averaged over the seeds that settled (in brackets; qualifying only in the last round does not count);
+Excess: mean validation error above centralised over the first 30 rounds.}\label{tab:het}
 \input{generated/rev_heterogeneity.tex}
 \end{table}
 
 
 \subsection{Forecaster strength, client-only training and other cohorts}
-Calendar inputs did not strengthen the forecaster (Supplementary Table S8): centralised MAE went from
+Calendar inputs did not strengthen the forecaster (Supplementary Table S10): centralised MAE went from
 \EtwocentralizedMAE{} to \RvCalCentralisedmaecal{}\,kWh, and with one home per client FedAvg became worse
 (\RvCalFedonezerozeromaecal{}\,kWh, a gap of \RvCalFedonezerozeroGapCal{}\,\%). With MASE, centralised training
 (\RvCalCentralisedmase{}) beat the in-sample naive scale while FedAvg with one home per client (\RvCalFedonezerozeromase{})
-did not; persistence scored \RvMASEPersistence{} on the test period. 
+did not; persistence scored \RvMASEPersistence{} on the test period. The claims of this paper are therefore limited to
+one-step forecasts.
 
-The client-only arm tests what federation adds once homes are pooled. Each of five clients training alone on its 20
-homes reached \RvClientKfiveMAE{}\,kWh, against \RvClientKfiveFedMAE{}\,kWh for FedAvg over the same five clients;
-per household FedAvg was better for \RvClientKfiveFedBetter{}\,\% of homes, which was not significant ($p$
-\RvClientKfiveFedP{}, uncorrected). At $K=20$ (five homes per client) the two were again not significantly different
-(\RvClientKtwentyMAE{} against \RvClientKtwentyFedMAE{}\,kWh, FedAvg better for \RvClientKtwentyFedBetter{}\,\%, $p$
-\RvClientKtwentyFedP{}). Only with local fine-tuning did federation beat client-only training, for
-\RvClientKfiveFTBetter{}\,\% of households at $K=5$ ($p$ \RvClientKfiveFTP{}) and \RvClientKtwentyFTBetter{}\,\% at
-$K=20$ ($p$ \RvClientKtwentyFTP{}).
+The client-only arm tests what federation adds once homes are pooled (Table~\ref{tab:main}). Each of five clients
+training alone on its 20 homes reached \RvCliFTKfiveMAE{}\,kWh, against \EonefourfedavgKfiveMAE{}\,kWh for FedAvg over
+the same five clients ($\Delta=\RvTsFedCliKfiveDiff{}$, CI \RvTsFedCliKfiveLo{} to \RvTsFedCliKfiveHi{},
+$p_{\mathrm{Holm}}$\,\RvTsFedCliKfiveP{}); at $K=20$ the two were \RvCliFTKtwentyMAE{} and \EthreefedavgiidMAE{}\,kWh
+($\Delta=\RvTsFedCliKtwentyDiff{}$, $p_{\mathrm{Holm}}$\,\RvTsFedCliKtwentyP{}). To compare like with like, the
+client-only models were also fine-tuned for one epoch on each home. Fine-tuning helped them little (\RvCliFTKfiveFT{}
+and \RvCliFTKtwentyFT{}\,kWh), because they had already been trained on the same homes, whereas it helped FedAvg more:
+FedAvg with fine-tuning was better than client-only with fine-tuning by $\Delta=\RvTsFedCliFTKfiveDiff{}$ at $K=5$ (CI
+\RvTsFedCliFTKfiveLo{} to \RvTsFedCliFTKfiveHi{}, $p_{\mathrm{Holm}}$\,\RvTsFedCliFTKfiveP{}) and
+\RvTsFedCliFTKtwentyDiff{} at $K=20$ (CI \RvTsFedCliFTKtwentyLo{} to \RvTsFedCliFTKtwentyHi{},
+$p_{\mathrm{Holm}}$\,\RvTsFedCliFTKtwentyP{}), in \RvTsFedCliFTKfiveSeeds{} and \RvTsFedCliFTKtwentySeeds{} paired seeds,
+although neither difference was significant after correction.
 
-The growth of the gap with $K$ was repeated in the two further cohorts (Supplementary Table S5), although its size
-varied: at $K=100$ it ranged from \RvCohortGapKonezerozeroLo{} to \RvCohortGapKonezerozeroHi{}\,\% across the three
-cohorts, and at $K=20$ from \RvCohortGapKtwozeroLo{} to \RvCohortGapKtwozeroHi{}\,\%. The ranking of centralised and
-local training was not stable: local-only training was between \RvCohortLocalGapLo{} and \RvCohortLocalGapHi{}\,\% from
-centralised, and in one cohort it was the better of the two.
+\begin{table}
+\caption{Gap to centralised training (\%) in three cohorts of 100 homes, FedAvg after 30 rounds, homes grouped at random
+and windows dealt at random (IID control). Each cohort is compared with its own centralised arm. Main cohort: all seeds
+of Table~\ref{tab:frag}; second and third cohorts: two seeds.}\label{tab:cohorts}
+\input{generated/rev_cohorts2.tex}
+\end{table}
+
+The growth of the gap with $K$ and the share kept by the control were repeated in the two further cohorts
+(Table~\ref{tab:cohorts}). With 20 or more clients the control kept \RvCoShareBigLo{}--\RvCoShareBigHi{}\,\% of the gap
+with homes in every cohort. At $K=5$ the gaps were small (at most \RvCoHomeKfiveHi{}\,\%) and changed sign between cohorts, so a share is
+not meaningful there. The size of the gap varied: at $K=100$ it ranged from \RvCohortGapKonezerozeroLo{} to
+\RvCohortGapKonezerozeroHi{}\,\% across cohorts and at $K=20$ from \RvCohortGapKtwozeroLo{} to
+\RvCohortGapKtwozeroHi{}\,\%. The ranking of centralised and local training was not stable either: local-only training
+was between \RvCohortLocalGapLo{} and \RvCohortLocalGapHi{}\,\% from centralised, and in one cohort it was the better of
+the two.
 
 
 \subsection{Proximal regularisation}
 Validation tuning over a grid that included $\mu=0$ selected $\mu=0$, that is plain FedAvg (validation MAE
 \RvTuneFedAvgVal{} against \RvTunefedproxBestPosVal{}\,kWh for the best positive coefficient, $\mu=\RvTunefedproxBestPos{}$;
-Supplementary Table S4). FedProx with that coefficient was practically indistinguishable from FedAvg (median paired
-difference \StEfivefedproxmoderatevsEfourfedavgmoderateMed{}\,kWh at $\alpha=0.3$). An adaptive schedule driven by the disagreement between client updates did not improve on FedAvg either
-(Supplementary Section S3).
+Supplementary Table S4). FedProx with that coefficient was practically indistinguishable from FedAvg at $\alpha=0.3$
+($\Delta=\RvTsProxAvgDiff{}$, CI \RvTsProxAvgLo{} to \RvTsProxAvgHi{}, $p_{\mathrm{Holm}}$\,\RvTsProxAvgP{}). An adaptive
+schedule driven by the disagreement between client updates did not improve on FedAvg either ($\Delta=\RvTsHaAvgDiff{}$
+under cluster grouping, $p_{\mathrm{Holm}}$\,\RvTsHaAvgP{}; Supplementary Section S3).
 
 \subsection{Communication}
 One message was \PayloadKB{}\,kB, so 30 rounds with $K=20$ moved \EthreefedavgiidMB{}\,MB and household clients moved
 \EonethreefedavghouseholdMB{}\,MB (Table~\ref{tab:main}). The eight months of training readings of the cohort
 (\RvRawReadings{} million values) occupy \RvRawTwo{}\,MB at 2 bytes per reading, \RvRawFour{}\,MB at 4 bytes,
 \RvRawTwelve{}\,MB at 12 bytes and \RvRawCsv{}\,MB in the public comma-separated format (about \RvCsvBytesPerRow{}
-bytes per row). Thirty rounds of federation at $K=20$ thus moved more bytes than the readings in any of these
-encodings. Partial participation with stragglers lowered total traffic to \EeightfedavgpartialMB{}\,MB and 16-bit
-updates halved it (\EonetwofedavgfponesixmoderateMB{}\,MB). Neither lost accuracy: 16-bit updates were marginally
-better than 32-bit for \RvPrecfponesixBetter{}\,\% of households (median \RvPrecfponesixMed{}\,kWh, $p$
-\RvPrecfponesixP{}) and partial participation for \RvPrecpartialBetter{}\,\% (median \RvPrecpartialMed{}\,kWh, $p$
-\RvPrecpartialP{}). Both plausibly act as mild regularisers; the effects are below 1\,\% of MAE.
+bytes per row). Thirty rounds at $K\ge20$ with 32-bit updates and full participation thus moved more bytes than the
+readings in any of these encodings. Settings with less traffic, $K=5$ (\EonefourfedavgKfiveMB{}\,MB), 16-bit updates
+(\EonetwofedavgfponesixmoderateMB{}\,MB) and half participation with stragglers (\EeightfedavgpartialMB{}\,MB), moved
+more than the binary encodings but less than the comma-separated file: partial participation lowered total traffic to
+\EeightfedavgpartialMB{}\,MB and 16-bit updates halved it. Neither of the two lost accuracy: the changes in pooled MAE were
+\RvPrecfponesixRel{} and \RvPrecpartialRel{}\,\% ($\Delta=\RvTsFponesixDiff{}$ and \RvTsPartialDiff{},
+$p_{\mathrm{Holm}}$\,\RvTsFponesixP{} and \RvTsPartialP{}), and \RvTsFponesixHH{} and \RvTsPartialHH{}\,\% of households
+did better. Both plausibly act as mild regularisers. Training to a plateau multiplies traffic by the number of rounds
+(see the plateau runs above), so at these settings the bandwidth comparison with the raw readings only becomes less favourable to
+federation with longer training.
 
 \subsection{Who gains from federation?}
-Table~\ref{tab:harm} and Supplementary Fig.~S2 give the per-household view. With the 1\,\% margin, centralised training
+Table~\ref{tab:harm}, Supplementary Table S9 and Supplementary Fig.~S2 give the per-household view. With the 1\,\% margin, centralised training
 harmed \RvHarmCentralisedMargin{}\,\% of households and helped \RvHelpCentralisedMargin{}\,\%. FedAvg at $K=20$ harmed
 \RvHarmFedrandomMargin{}\,\% (random grouping) to \RvHarmFedModerateMargin{}\,\% ($\alpha=0.3$) of households, and
 \RvHarmFedKonezerozeroMargin{}\,\% with one home per client. One epoch of fine-tuning reduced the share at $\alpha=0.3$
 to \RvHarmFedModerateFTMargin{}\,\%, after which FedAvg was not significantly different from local training
-($p_{\mathrm{Holm}}$ \pv{\StEfourfedavgmoderateFTvsEonelocalP}); with one home per client it reduced the share to
-\RvHarmFedKonezerozeroFTMargin{}\,\%. The benefit of pooling was largest for the highest-consuming fifth of homes:
+($\Delta=\RvTsModFTLocDiff{}$, $p_{\mathrm{Holm}}$\,\RvTsModFTLocP{}). With one home per client fine-tuning reduced the
+share to \RvHarmFedKonezerozeroFTMargin{}\,\%, but FedAvg with fine-tuning (\EonethreefedavghouseholdFT{}\,kWh) remained
+less accurate than local models (\EonelocalMAE{}\,kWh; $\Delta=\RvTsKhundredFTLocDiff{}$, CI \RvTsKhundredFTLocLo{} to
+\RvTsKhundredFTLocHi{}, $p_{\mathrm{Holm}}$\,\RvTsKhundredFTLocP{}; not significant after correction). The benefit of pooling was largest for the highest-consuming fifth of homes:
 their median MAE was \RvQTopLocal{}\,kWh with local models, \RvQTopCentral{}\,kWh with centralised training and
-\RvQTopFed{}\,kWh with FedAvg at $\alpha=0.3$ (Supplementary Table S6).
+\RvQTopFed{}\,kWh with FedAvg at $\alpha=0.3$ (Supplementary Table S8).
+
+
+
 
 \begin{table}
 \caption{Share of households (\%) whose test MAE was worse than local-only training at all, worse by more than 1\,\%,
@@ -374,54 +487,59 @@ and better by more than 1\,\%. FedAvg at $K=20$ unless stated; FT: after one epo
 
 \section{Discussion}
 
-Most of the accuracy cost of federation in this setting came from fragmentation. Splitting the same data over more
-clients cost accuracy even when the clients were statistically identical, as described for local stochastic gradient descent:
-smaller shards give each client fewer steps between averages, and the average of many short local trajectories
-progresses less per round than one pass over the pooled data~\cite{stich2019localsgd,woodworth2020localsgd,woodworth2020minibatch}. Part of this cost is recoverable with more rounds, at
-proportionally more traffic. Heterogeneity was a real but smaller cost, and
-it mainly slowed convergence. This is why drift remedies helped little here. The heterogeneity reachable with these homes was limited ($H_{\mathrm{JS}}$ at most \RvHJSHomeKhundred{}),
-and populations with photovoltaics, electric vehicles or heat pumps may differ much more, so the relative weight of the
-two costs should not be generalised beyond London households of this kind.
+After a fixed budget, most of the accuracy cost of federation in this setting came from fragmentation and from the
+budget itself. Splitting the same data over more clients cost accuracy even when the clients were statistically
+identical, as described for local stochastic gradient descent: smaller shards give each client fewer steps between
+averages, and the average of many short local trajectories progresses less per round than one pass over the pooled
+data~\cite{stich2019localsgd,woodworth2020localsgd,woodworth2020minibatch}. Training to a plateau recovered a large part
+of this cost, at a traffic of gigabytes per run, but not all of it, and the part that remained with identical clients
+was of the same order as the part attributable to heterogeneity. Heterogeneity mainly slowed early convergence, through
+disagreeing client updates, which is why drift remedies helped little here, whereas a server-side adaptive optimiser,
+which acts on the budget, narrowed the meter-level gap. The heterogeneity
+reachable with these homes was limited ($H_{\mathrm{JS}}$ at most \RvHJSHomeKhundred{}), and populations with
+photovoltaics, electric vehicles, heat pumps or time-of-use tariffs, or clients of unequal size, may differ much more,
+so the relative weight of the costs should not be generalised beyond London households of this kind.
 
-In practice, the number of clients was the most consequential choice. Federating five aggregated clients cost
-\RvHomeKfiveGap{}\,\% in MAE, meter-level federation \RvHomeKhundredGap{}\,\% with 30 rounds and \RvLongKhundredGap{}\,\%
-with up to 100. Since one household's eight months of training readings occupy about 47\,kB even at 4 bytes per value,
-less than one 68.9\,kB message, federation at this scale is a governance choice based on data minimisation and consent,
-not a bandwidth saving. Operators should federate few, aggregated clients, budget rounds by local steps rather than epochs,
-fine-tune locally and check errors per consumption tier.
+In practice, the number of clients and the budget were the most consequential choices. Federating five aggregated
+clients cost \RvHomeKfiveGap{}\,\% in MAE after 30 rounds; meter-level federation cost \RvHomeKhundredGap{}\,\% after 30
+rounds and \RvPlhomesKhundredGap{}\,\% at the plateau, after up to \RvPlhomesKhundredMBtotal{}\,MB of traffic. Since one
+household's eight months of training readings occupy about 47\,kB even at 4 bytes per value, less than one 68.9\,kB
+message, federation at this scale is a governance choice based on data minimisation and consent, not a bandwidth
+saving. Operators should federate few, aggregated clients held by a trusted hub such as a building gateway or energy
+community, budget rounds by local steps rather than epochs, fine-tune locally and check errors per consumption tier;
+a hub gains little from federating with other hubs unless the shared model is fine-tuned on its homes.
 
 The results agree with Briggs et al.~\cite{briggs2022} that plain FedAvg can lose to local models on LCL, and that
 local fine-tuning recovers most of the loss. They differ on centralised training, which was the best arm here but
 4.8\,\% worse than localised learning in their Table~II. Their models were smaller (two layers of 20 units), used hourly
-sequences of 6 to 24 steps and trained for up to 500 epochs, and their centralised error was averaged over sequences
-rather than per client. The measured traffic supports the argument of Briggs et al.~\cite{briggs2020ccai} rather than the analytic
-savings of Taïk and Cherkaoui~\cite{taik2020}, who compared a model of ``1.9\,kb'' with 16\,Mb of data. Their two LSTM
-layers of 200 units imply roughly $4.8\times10^5$ weights, about 1.9\,MB in 32-bit floats, so the printed unit is
-probably a slip; with that correction their model would be of the same order as their data, as here.
+sequences of 6 to 24 steps and were trained for up to 500 epochs, and their centralised error was averaged over
+sequences rather than per client. A budget that large is consistent with the present finding that much of the federated
+gap is a budget cost. The measured traffic supports the argument of Briggs et al.~\cite{briggs2020ccai} rather than the
+analytic savings of Taïk and Cherkaoui~\cite{taik2020}, whose ``1.9\,kb'' model (two LSTM layers of 200 units, about
+1.9\,MB in 32-bit floats) was probably a unit slip and would be of the same order as their 16\,Mb of data.
 
-Pooling homes into community clients requires a trusted holder, such as a building gateway, an energy community
-or a supplier that already reads the meters; an outside aggregator is not one. Where such a holder exists, the client-only results show that it gains little from
-federating with other hubs unless the shared model is fine-tuned locally. Where no intermediary is trusted, only the
-one-home-per-client setting applies, and there the fragmentation cost is largest.
-
-The study covers one dataset and year, one horizon and a small LSTM. The forecaster is close to
-persistence (MASE near one), as is typical for single homes at this resolution, so absolute gains are small. The
-network was simulated, traffic counts payload only, and data locality is not a formal privacy
-guarantee~\cite{zhu2019leakage,geiping2020inverting}: neither differential privacy nor secure aggregation was applied.
-Hyper-parameters other than the proximal coefficients and the number of rounds were fixed for all arms, and server-side
-adaptive optimisers~\cite{reddi2021fedopt} were not tested.
+The study covers one dataset and year, standard-tariff homes in equal-sized clients, one-step forecasts and a small LSTM,
+and its claims are limited to that horizon; day-ahead forecasting with rolling evaluation was not tested. The forecaster
+is close to persistence (MASE near one), as is typical for single homes at this resolution, so absolute gains are small.
+Three to five seeds per arm gave little power at run level, so several differences that were consistent in direction were not
+significant after correction. The network was simulated, traffic counts payload only, and data locality is not a formal
+privacy guarantee~\cite{zhu2019leakage,geiping2020inverting}: neither differential privacy nor secure aggregation was
+applied.
 
 \section{Conclusion}
 
 Holding households, test set and model fixed on 100 Low Carbon London homes and two further cohorts, this study found
-that the error of federated household load forecasting grew with the number of clients the same homes were spread over, to \RvHomeKhundredGap{}\,\% when every home was its own
-client, and most of that growth remained when clients received random shares of the data and did not differ at all.
-Measured heterogeneity added a smaller cost and slightly slowed convergence; training for longer narrowed but did not
-close the gap. Federated training moved more bytes than the readings it kept local, and one epoch of local fine-tuning
-removed most of the harm to individual households at community scale, while calendar inputs and proximal
-regularisation brought no benefit. The federated accuracy gap in this setting is mainly a fragmentation and budget cost,
-and the case for federation in residential forecasting rests on governance rather than bandwidth. Future work will test
-more heterogeneous populations, other horizons and larger models, and add differential privacy and secure aggregation.
+that the error of federated household load forecasting grew with the number of clients the same homes were spread
+over, to \RvHomeKhundredGap{}\,\% after 30 rounds when every home was its own client, and that most of that growth
+remained when clients received random shares of the data and did not differ at all. Training to a plateau removed much
+of the gap at a large traffic cost, but not all of it, even for identical clients; heterogeneity added a smaller cost
+and slowed early convergence. A server-side adaptive optimiser recovered part of the budget cost with one home per
+client; keeping client optimiser state or using client SGD did not. With 20 or more clients, training moved more bytes than the readings
+it kept local, and local fine-tuning reduced, but did not remove, the share of harmed households. Calendar inputs and
+proximal regularisation brought no benefit. For one-step forecasts, the federated gap here is mainly a cost of budget
+and fragmentation, and the case for federation in residential forecasting rests on governance rather than bandwidth.
+Future work will test more heterogeneous populations and unequal clients, day-ahead horizons with rolling evaluation,
+larger models, and differential privacy and secure aggregation.
 
 \begin{declarations}
 \lead{Acknowledgements.} The authors thank UK Power Networks for making the Low Carbon London trial data publicly available.
@@ -434,5 +552,5 @@ more heterogeneous populations, other horizons and larger models, and add differ
 
 \lead{Author contributions.} Pushkal Gupta: conceptualisation, methodology, software, data curation, investigation, formal analysis, visualisation, writing -- original draft. Vanka Kaushik: conceptualisation, investigation, validation, writing -- review and editing. Kalaavathi B: supervision, methodology, writing -- review and editing.
 
-\lead{Declaration of generative AI use.} During the preparation of this work the authors used Claude (Anthropic), an AI assistant, to help write and test the software pipeline and to draft and edit the text of the manuscript. After using this tool, the authors reviewed and edited the code, the results and the content as needed and take full responsibility for the content of the publication.
+\lead{Declaration of generative AI and AI-assisted technologies in the writing process.} During the preparation of this work the authors used Claude (Anthropic) to help write and test the simulation and analysis software (Section 3 and the code repository) and to draft and edit the text of all sections (Abstract and Sections 1--6) and of the supplementary material. The tool was not used to generate data or results: every number comes from the authors' experiment runs through scripts in the repository. After using this tool, the authors reviewed and edited the code, the results and the content as needed and take full responsibility for the content of the publication.
 \end{declarations}

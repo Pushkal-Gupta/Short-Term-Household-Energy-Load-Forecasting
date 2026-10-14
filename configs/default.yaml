@@ -62,7 +62,12 @@ fed:
   straggler_min_work: 0.1     # stragglers finish U(min_work, 1) of their local work
   drop_stragglers: null       # null -> FedAvg drops, FedProx/HA-FedProx keep partial work
   update_precision: float32   # float32 | float16 (communication ablation)
-  finetune_epochs: 1          # personalisation evaluation (FedAvg-FT); 0 disables
+  finetune_epochs: 1          # personalisation evaluation (FedAvg-FT, client-only-FT); 0 disables
+  client_optimizer: adam      # adam (fresh state every round) | adam_keep (state kept across rounds) | sgd
+  client_lr: 0.1              # plain SGD step size (client_optimizer: sgd only)
+  server_optimizer: none      # none (FedAvg step) | adam (FedAdam, Reddi et al. 2021)
+  server_lr: 0.01             # FedAdam step size eta
+  server_tau: 0.001           # FedAdam adaptivity tau
 
 eval:
   mape_min_actual: 0.05       # MAPE computed only where actual >= this (kWh per half-hour)

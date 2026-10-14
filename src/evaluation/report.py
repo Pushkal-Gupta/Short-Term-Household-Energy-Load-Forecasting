@@ -86,16 +86,18 @@ def summary_table(runs: pd.DataFrame) -> pd.DataFrame:
 
 
 def _eps_metrics(rundir, runs, central_val, eps):
-    """R@eps / B@eps per run: first round whose val MAE <= (1 + eps/100) * centralised val MAE."""
+    """R@eps / B@eps per run: first round after which val MAE stays <= (1 + eps/100) * centralised val MAE."""
     rows = []
     for _, r in runs[runs["method"] == "federated"].iterrows():
         f = rundir / f"{r['experiment']}__seed{r['seed']}_history.csv"
         h = pd.read_csv(f)
         cv = central_val.get(r["seed"], np.mean(list(central_val.values())) if central_val else np.nan)
-        hit = h[h["val_mae"] <= (1 + eps / 100) * cv]
+        above = h["val_mae"].to_numpy() > (1 + eps / 100) * cv
+        ok = len(h) and not above[-1]
+        i = (0 if not above.any() else int(np.nonzero(above)[0][-1]) + 1) if ok else None
         rows.append({"experiment": r["experiment"], "seed": r["seed"],
-                     "R_eps": int(hit["round"].iloc[0]) if len(hit) else np.nan,
-                     "B_eps_MB": float(hit["cumulative_bytes"].iloc[0]) / 1e6 if len(hit) else np.nan})
+                     "R_eps": int(h["round"].iloc[i]) if ok else np.nan,
+                     "B_eps_MB": float(h["cumulative_bytes"].iloc[i]) / 1e6 if ok else np.nan})
     return pd.DataFrame(rows)
 
 
@@ -115,7 +117,7 @@ def build_report(cfg: dict, write_paper: bool | None = None) -> dict:
     mdir = results_path(cfg, "metrics", "x").parent
     pdir = results_path(cfg, "plots", "x").parent
     runs.to_csv(mdir / "runs_all.csv", index=False)
-    main = runs[~runs["experiment"].str.startswith(("T_", "T2_", "t_", "probe", "flower", "sim_", "C43_", "C44_", "E15_", "E16_", "E17_", "E18_", "E19_"))]
+    main = runs[~runs["experiment"].str.startswith(("T_", "T2_", "t_", "probe", "flower", "sim_", "C43_", "C44_", "E15_", "E16_", "E17_", "E18_", "E19_", "E20_", "E21_", "E22_", "E23_", "T3_"))]
     S = summary_table(main)
     eps = float(cfg["eval"].get("epsilon_pct", 10.0))
 

@@ -40,14 +40,15 @@ XSL_CANDIDATES = [HERE / "mathml2omml.xsl",
                   Path("/Applications/Microsoft Word.app/Contents/Resources/mathml2omml.xsl")]
 
 TITLE = "Fragmentation, not heterogeneity, drives the accuracy cost of federated household load forecasting"
-AUTHORS = [("Pushkal Gupta", "1,*"), ("Vanka Kaushik", "1"), ("Kalaavathi B", "1")]
+AUTHORS = [("Pushkal Gupta", "1"), ("Vanka Kaushik", "1"), ("Kalaavathi B", "1,*")]
 AFFILIATIONS = [("1", "School of Computer Science and Engineering, Vellore "
                       "Institute of Technology, Vellore 632014, Tamil Nadu, India")]
-CORRESPONDING = "* Corresponding author: pushkal.gupta2023@vitstudent.ac.in"
-EMAILS = "E-mail addresses: vanka.kaushik2023@vitstudent.ac.in (V. Kaushik), kalaavathi.b@vit.ac.in (Kalaavathi B)"
-ORCID = "ORCID: 0009-0004-7032-6847 (Pushkal Gupta)"
-KEYWORDS = ["smart meters", "long short-term memory", "non-IID data", "communication efficiency",
-            "Low Carbon London", "personalisation"]
+CORRESPONDING = "* Corresponding author: Kalaavathi B, kalaavathi.b@vit.ac.in"
+EMAILS = "E-mail addresses: pushkal.gupta2023@vitstudent.ac.in (P. Gupta), vanka.kaushik2023@vitstudent.ac.in (V. Kaushik)"
+ORCID = ("ORCID: 0009-0004-7032-6847 (Pushkal Gupta), 0009-0003-0735-264X (Vanka Kaushik), "
+         "0000-0003-4027-3137 (Kalaavathi B)")
+KEYWORDS = ["federated learning", "load forecasting", "smart meters", "non-IID data", "communication efficiency",
+            "personalisation", "Low Carbon London"]
 HEADER = "Manuscript for review"
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -94,6 +95,7 @@ def expand(text: str, macros: dict[str, str]) -> str:
         v = body.strip()
         v = v if v.startswith(("$<", "$=", "$>", "n/a")) else f"= {v}"
         text = text[:i] + v + text[j:]
+    text = re.sub(r"(?<![\w.)\]}{^_\-])-(?=\d)", "\u2212", text)        # negative numbers: true minus sign
     text = re.sub(r"\\the\\numexpr\s*(\d+)\s*-\s*(\d+)\s*\\relax", lambda m: str(int(m.group(1)) - int(m.group(2))),
                   text)
     return text
@@ -330,7 +332,8 @@ def parse_tabular(src: str) -> tuple[str, list[list[str]]]:
     spec, body = m.group(1), m.group(2)
     body = re.sub(r"\\(toprule|midrule|bottomrule|hline)", "", body)
     rows = [r.strip() for r in re.split(r"\\\\", body) if r.strip()]
-    return spec, [[c.strip() for c in re.split(r"(?<!\\)&", r)] for r in rows]
+    minus = lambda c: re.sub(r"(?<![\w.)\]}{^_\-])-(?=\d)", "\u2212", c)
+    return spec, [[minus(c.strip()) for c in re.split(r"(?<!\\)&", r)] for r in rows]
 
 
 def table_xml(spec: str, rows: list[list[str]], refs: Refs, prose: bool = False) -> str:

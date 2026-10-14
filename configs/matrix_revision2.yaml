@@ -1,0 +1,34 @@
+# Second-round revision experiments (answers to the second internal review). Run with:
+#   python -m src.experiments.run_matrix --matrix configs/matrix_revision2.yaml --phase main --workers 16
+# Long runs come first so that the parallel pool finishes evenly.
+# The optimiser runs of `main_opt` need the step sizes picked from the `T3_*` grid (validation MAE,
+# seed 42, K = 20); run them with --matrix configs/matrix_revision2_opt.yaml after the grid has finished.
+main:
+  # ---- Q1: run homes and windows to a plateau (up to 500 rounds, stop after 50 rounds without a new
+  #      best validation MAE) at K = 20, 50, 100 ----
+  - {name: E20_homes_K100_plateau,   method: federated, set: {fed.algorithm: fedavg, partition.mode: household, fed.rounds: 500, fed.patience_rounds: 50}}
+  - {name: E20_windows_K100_plateau, method: federated, set: {fed.algorithm: fedavg, partition.strategy: window_iid, partition.households_per_client: 1, fed.rounds: 500, fed.patience_rounds: 50}}
+  - {name: E20_homes_K50_plateau,    method: federated, set: {fed.algorithm: fedavg, partition.strategy: iid, partition.households_per_client: 2, fed.rounds: 500, fed.patience_rounds: 50}}
+  - {name: E20_windows_K50_plateau,  method: federated, set: {fed.algorithm: fedavg, partition.strategy: window_iid, partition.households_per_client: 2, fed.rounds: 500, fed.patience_rounds: 50}}
+  - {name: E20_homes_K20_plateau,    method: federated, set: {fed.algorithm: fedavg, partition.strategy: iid, fed.rounds: 500, fed.patience_rounds: 50}}
+  - {name: E20_windows_K20_plateau,  method: federated, set: {fed.algorithm: fedavg, partition.strategy: window_iid, partition.households_per_client: 5, fed.rounds: 500, fed.patience_rounds: 50}}
+  # ---- Q2: optimiser set-up. Client Adam state kept across rounds (no tuning needed: same lr) ----
+  - {name: E22_adamkeep_homes_K100, method: federated, set: {fed.algorithm: fedavg, fed.client_optimizer: adam_keep, partition.mode: household, fed.rounds: 100, fed.patience_rounds: 25}}
+  - {name: E22_adamkeep_homes_K20,  method: federated, set: {fed.algorithm: fedavg, fed.client_optimizer: adam_keep, partition.strategy: iid, fed.rounds: 100, fed.patience_rounds: 25}}
+  #      Step-size grid for client SGD and for FedAdam (validation only, seed 42, K = 20 random homes)
+  - {name: T3_sgd_lr0.1,       method: federated, seeds: [42], set: {fed.algorithm: fedavg, fed.client_optimizer: sgd, fed.client_lr: 0.1, partition.strategy: iid, fed.rounds: 100, fed.patience_rounds: 25}}
+  - {name: T3_sgd_lr0.3,       method: federated, seeds: [42], set: {fed.algorithm: fedavg, fed.client_optimizer: sgd, fed.client_lr: 0.3, partition.strategy: iid, fed.rounds: 100, fed.patience_rounds: 25}}
+  - {name: T3_sgd_lr1.0,       method: federated, seeds: [42], set: {fed.algorithm: fedavg, fed.client_optimizer: sgd, fed.client_lr: 1.0, partition.strategy: iid, fed.rounds: 100, fed.patience_rounds: 25}}
+  - {name: T3_fedadam_lr0.001, method: federated, seeds: [42], set: {fed.algorithm: fedavg, fed.server_optimizer: adam, fed.server_lr: 0.001, partition.strategy: iid, fed.rounds: 100, fed.patience_rounds: 25}}
+  - {name: T3_fedadam_lr0.003, method: federated, seeds: [42], set: {fed.algorithm: fedavg, fed.server_optimizer: adam, fed.server_lr: 0.003, partition.strategy: iid, fed.rounds: 100, fed.patience_rounds: 25}}
+  - {name: T3_fedadam_lr0.01,  method: federated, seeds: [42], set: {fed.algorithm: fedavg, fed.server_optimizer: adam, fed.server_lr: 0.01, partition.strategy: iid, fed.rounds: 100, fed.patience_rounds: 25}}
+  # ---- Q3: IID window control in the two other cohorts (seeds 42 and 43, as for their other arms) ----
+  - {name: C43_window_K100, method: federated, seeds: [42, 43], set: {data.selection_seed: 43, data.processed_dir: data/processed/cohort43, fed.algorithm: fedavg, partition.strategy: window_iid, partition.households_per_client: 1}}
+  - {name: C44_window_K100, method: federated, seeds: [42, 43], set: {data.selection_seed: 44, data.processed_dir: data/processed/cohort44, fed.algorithm: fedavg, partition.strategy: window_iid, partition.households_per_client: 1}}
+  - {name: C43_window_K20,  method: federated, seeds: [42, 43], set: {data.selection_seed: 43, data.processed_dir: data/processed/cohort43, fed.algorithm: fedavg, partition.strategy: window_iid, partition.households_per_client: 5}}
+  - {name: C44_window_K20,  method: federated, seeds: [42, 43], set: {data.selection_seed: 44, data.processed_dir: data/processed/cohort44, fed.algorithm: fedavg, partition.strategy: window_iid, partition.households_per_client: 5}}
+  - {name: C43_window_K5,   method: federated, seeds: [42, 43], set: {data.selection_seed: 43, data.processed_dir: data/processed/cohort43, fed.algorithm: fedavg, partition.strategy: window_iid, partition.households_per_client: 20}}
+  - {name: C44_window_K5,   method: federated, seeds: [42, 43], set: {data.selection_seed: 44, data.processed_dir: data/processed/cohort44, fed.algorithm: fedavg, partition.strategy: window_iid, partition.households_per_client: 20}}
+  # ---- Q6: client-only training followed by the same one-epoch per-home fine-tuning as FedAvg-FT ----
+  - {name: E21_clientlocal_ft_K5,  method: clientlocal, set: {partition.strategy: iid, partition.households_per_client: 20}}
+  - {name: E21_clientlocal_ft_K20, method: clientlocal, set: {partition.strategy: iid, partition.households_per_client: 5}}

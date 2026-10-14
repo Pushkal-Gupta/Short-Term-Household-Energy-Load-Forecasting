@@ -4,26 +4,32 @@
 
 \title{Supplementary material}
 
-\section{Paired household-level tests}
-Table~\ref{tab:stats} lists every paired comparison. Each household's test MAE was averaged over the seeds of an arm
-before testing, so each test has one pair per household (100 pairs). The Holm correction was applied over all rows of
-the table together. Median $\Delta$MAE is the median over households of the difference A minus B; negative values
-favour A.
+\section{Run-level tests}
+Table~\ref{tab:stats} lists every comparison in the paper. Households scored by one trained model are not independent,
+so the unit of replication is the training run: each run contributes its pooled test MAE. Where both arms ran with the
+same seeds, the differences were paired by seed (paired $t$-test); otherwise Welch's $t$-test was used. With every
+household present in every run, this is equivalent to testing the arm in a linear mixed model with crossed random
+effects for household and run. The Holm correction was applied over all rows together, and it is the only correction
+used in the paper. $\Delta$MAE is A minus B; negative values favour A. The share of households doing better under A is
+descriptive only.
 
 \begin{table}
-\caption{Wilcoxon signed-rank tests over households (seed-averaged MAE). A better: share of households with lower MAE
-under A.}\label{tab:stats}
-\input{generated/table_stats.tex}
+\caption{Run-level comparisons ($10^{-4}$\,kWh, 95\,\% confidence interval). Test: paired by seed ($n$ pairs) or Welch
+($n_A+n_B$ runs).}\label{tab:stats}
+\input{generated/rev_stats.tex}
 \end{table}
 
 \section{Training budget and round selection}
 Table~\ref{tab:budget} gives, for each number of clients, the local Adam steps per client and round, the round chosen
 on validation error and the test MAE, for the 30-round budget of the main text and for runs of up to 100 rounds that
-stopped after 25 rounds without a new best validation MAE. Fig.~\ref{fig:budget} shows the validation curves.
+stopped after 25 rounds without a new best validation MAE; for the latter, the best and last round of each seed.
+Fig.~\ref{fig:budget} shows the validation curves. These 100-round runs are the reference for the optimiser comparison
+(Section S6); the plateau runs are in Section S5.
 
 \begin{table}
 \caption{Budget per number of clients $K$ (FedAvg, random grouping). Steps/round: Adam steps per client per round.
-Best rd.: round selected on validation MAE (mean over seeds). Gap: test MAE relative to centralised.}\label{tab:budget}
+Best rd.: round selected on validation MAE (mean over seeds). Best / run: best round and rounds run per seed. Gap:
+test MAE relative to centralised.}\label{tab:budget}
 \input{generated/rev_budget.tex}
 \end{table}
 
@@ -40,9 +46,9 @@ computes
 \begin{equation}\label{eq:rho}
 \rho_r=\frac{\sum_k p_k\lVert\Delta_k-\bar{\Delta}\rVert^2}{\sum_k p_k\lVert\Delta_k\rVert^2}\in[0,1],\qquad \mu_{r+1}=\mathrm{clip}\left(\mu_0\rho_r,\ 10^{-4},\ 1\right).
 \end{equation}
-The rule never improved on FedAvg. Under the cluster partition it was worse for
-\the\numexpr100-\StEonezerohafedproxstrongvsEsixfedavgstrongBetter\relax\,\% of households ($p_{\mathrm{Holm}}$
-\pv{\StEonezerohafedproxstrongvsEsixfedavgstrongP}). Its signal $\rho_r$ ranked partitions by heterogeneity (Spearman
+The rule never improved on FedAvg. Under the cluster partition its run-level difference from FedAvg was
+$\Delta=\RvTsHaAvgDiff{}\times10^{-4}$\,kWh (95\,\% CI \RvTsHaAvgLo{} to \RvTsHaAvgHi{}, $p_{\mathrm{Holm}}$\,\RvTsHaAvgP{}),
+and \RvTsHaAvgHH{}\,\% of households did better under it. Its signal $\rho_r$ ranked partitions by heterogeneity (Spearman
 \RhoHSpearman{} with $H_{\mathrm{JS}}$, $p$ \pv{\RhoHSpearmanP}, $n=\RhoHRuns{}$ runs), but on average it rose from
 \RhoRoundOne{} in round 1 to \RhoLast{} in the last round, a change about \RhoWithinOverBetween{} times its spread across
 partitions. As the shared descent direction shrinks during training, any residual disagreement pushes $\rho_r$ towards
@@ -50,7 +56,7 @@ one, so a coefficient proportional to it grows late in training whatever the dat
 three aggregation rules for each grouping.
 
 \begin{table}
-\caption{All aggregation rules for each grouping at $K=20$ (three seeds). $H$: composite index of the original
+\caption{All aggregation rules for each grouping at $K=20$ (mean $\pm$ s.d. over three to five seeds). $H$: composite index of the original
 submission; $\bar\rho$: mean update disagreement.}\label{tab:hetfull}
 \input{generated/table_heterogeneity.tex}
 \end{table}
@@ -64,14 +70,36 @@ $\mu=0$ is plain FedAvg.
 \input{generated/rev_tuning.tex}
 \end{table}
 
-\section{Additional cohorts}
-Two further cohorts of 100 homes were drawn with the same eligibility rules and stratification but different selection
-seeds (43 and 44); they share three or four homes with the main cohort. Each arm ran with two seeds.
+\section{Training to a plateau}
+FedAvg with homes grouped at random and with training windows dealt at random was trained for up to 500 rounds and
+stopped after 50 rounds without a new best validation MAE (three seeds). Table~\ref{tab:plateau} gives, per seed, the
+round selected on validation and the number of rounds run, with the traffic up to the best round and in total. A run
+that reached 500 rounds was still improving, and its gap is an upper bound.
 
 \begin{table}
-\caption{Test MAE (kWh) of the main arms on three cohorts, and the FedAvg gap to centralised training at $K=1$, 5,
-20 and 100.}\label{tab:cohorts}
-\input{generated/rev_cohorts.tex}
+\caption{FedAvg trained to a plateau. Clients: homes grouped at random, or training windows dealt at random (IID
+control). MB to best: traffic up to the selected round; MB total: traffic of the whole run (means over
+seeds).}\label{tab:plateau}
+\input{generated/rev_plateau.tex}
+\end{table}
+
+\section{Optimiser set-up}
+At $K=20$ (random grouping) and $K=100$ (one home per client), FedAvg with Adam restarted every round was compared
+with client Adam whose state is kept across rounds, plain client SGD, and FedAdam, all for up to 100 rounds and
+stopped after 25 rounds without improvement (Table~\ref{tab:opt}). Early rise: the largest rise of validation MAE above its running minimum
+in the first ten rounds. The SGD and server step sizes were chosen on validation MAE at $K=20$ (seed 42) over the grid
+of Table~\ref{tab:grid}.
+
+\begin{table}
+\caption{Optimiser set-up (FedAvg, up to 100 rounds; mean over seeds). Gap: test MAE relative to
+centralised.}\label{tab:opt}
+\input{generated/rev_optimisers.tex}
+\end{table}
+
+\begin{table}
+\caption{Step-size grid (validation MAE, $K=20$ random grouping, seed 42, up to 100 rounds). Diverged: validation
+error not finite.}\label{tab:grid}
+\input{generated/rev_optgrid.tex}
 \end{table}
 
 \section{Error by consumption quintile}

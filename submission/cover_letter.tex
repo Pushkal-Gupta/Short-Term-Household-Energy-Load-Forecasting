@@ -1,41 +1,42 @@
 \documentclass[11pt]{letter}
 \usepackage[margin=1in]{geometry}
 \usepackage[hidelinks]{hyperref}
-\signature{Pushkal Gupta\\Corresponding author, on behalf of all authors\\
+\signature{Kalaavathi B\\Corresponding author, on behalf of all authors\\
 School of Computer Science and Engineering\\
 Vellore Institute of Technology, Vellore 632014, Tamil Nadu, India\\
-\href{mailto:pushkal.gupta2023@vitstudent.ac.in}{pushkal.gupta2023@vitstudent.ac.in}}
+\href{mailto:kalaavathi.b@vit.ac.in}{kalaavathi.b@vit.ac.in}}
 \address{}
 \date{\today}
 \begin{document}
 \begin{letter}{The Editor\\Applied Energy}
 \opening{Dear Editor,}
 
-We submit the manuscript \emph{``What does heterogeneity cost? A controlled, communication-priced decomposition of
-federated LSTM load forecasting on London smart meters''} by Pushkal Gupta, Vanka Kaushik and Kalaavathi B for
-consideration as a Research Article in \emph{Applied Energy}.
+We submit the manuscript \emph{``Training budget and fragmentation, more than heterogeneity, drive the accuracy cost of
+federated household load forecasting''} by Pushkal Gupta, Vanka Kaushik and Kalaavathi B for consideration as a
+Research Article in \emph{Applied Energy}.
 
 Federated learning is increasingly proposed as the privacy-preserving way to forecast household electricity demand
 from smart-meter data. Two of its premises are rarely measured: that its accuracy loss is caused by heterogeneity
 between households, and that it saves bandwidth compared with collecting the data. Using 100 households from the
-public Low Carbon London trial, we hold the homes, the test set, the model and the compute budget fixed and change
-one factor at a time, while counting every byte exchanged. The main findings are:
+public Low Carbon London trial, we hold the homes, the test set and the model fixed, change one factor at a time, and
+count every byte exchanged. The main findings, all for one-step forecasts, are:
 \begin{itemize}
-\item The federated protocol on a single client matches centralised accuracy. The accuracy gap is caused by
-fragmentation: it grows with the number of clients the same homes are split over, from 2\,\% with five clients to
-10\,\% with one client per home.
-\item Heterogeneity between clients, dialled over real load-profile clusters and measured with a label-free index,
-barely changes final accuracy, but it raises the traffic needed to approach centralised accuracy by about 85\,\%.
-\item With a small LSTM and half-hourly data, federated training moves more bytes than uploading the raw readings.
-The case for federation is therefore governance, not bandwidth.
-\item Plain FedAvg leaves most households worse off than local models. One epoch of local fine-tuning, at no
-communication cost, largely removes this at community scale. Proximal regularisation does not help, and we show why
-an update-dissimilarity-adaptive variant fails.
+\item The gap to centralised training grows with the number of clients the same homes are split over, from 1.8\,\% with
+five clients to 10.0\,\% with one client per home after 30 rounds. A control that deals training windows rather than
+homes, so that clients do not differ at all, keeps 71--96\,\% of the gap with 20 or more clients in three cohorts.
+\item Much of this cost is training budget: run to a plateau, at up to 4.7\,GB of traffic per run, the gap shrinks to
+1.8--5.4\,\% for homes and 1.3--3.5\,\% for identical clients, so a fragmentation cost remains without any
+heterogeneity. A server-side adaptive optimiser recovers part of the budget cost; client-side optimiser changes do not.
+\item With 20 or more clients, federated training of a small LSTM moves more bytes than the raw half-hourly readings in
+any encoding, so the case for federation is governance, not bandwidth.
+\item Local fine-tuning reduces, but does not remove, the share of households that federation leaves worse off; with
+one home per client, fine-tuned federated models still lose to local ones. Calendar inputs and proximal
+regularisation do not help.
 \end{itemize}
 These results give distribution system operators, suppliers and aggregators concrete guidance: federate a few
-aggregated clients rather than individual meters, fine-tune locally, and budget heterogeneity as communication. We
-believe this fits the journal's focus on data-driven methods for energy systems with clear practical implications.
-All code, configurations and per-run results are provided, and every number in the manuscript is generated from them.
+aggregated clients rather than individual meters, budget rounds by local steps, fine-tune locally and check errors
+per household. All code, configurations and per-run results are provided, and every number in the manuscript is
+generated from them.
 
 This manuscript is original, has not been published, and is not under consideration elsewhere. All authors have
 approved the manuscript and agree with its submission. The authors declare no competing interests. The use of

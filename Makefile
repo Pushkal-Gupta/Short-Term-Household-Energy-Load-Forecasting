@@ -65,7 +65,7 @@ docx:
 	$(PY) paper/docx/build_docx.py
 	$(PY) paper/docx/build_docx.py --long
 	$(PY) paper/docx/build_docx.py --supp
-	$(PY) paper/docx/response.py
+	$(PY) paper/docx/response2.py
 
 clean:
 	rm -rf __pycache__ src/__pycache__ .pytest_cache

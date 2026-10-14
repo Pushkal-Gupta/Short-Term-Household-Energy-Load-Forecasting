@@ -198,17 +198,37 @@ Revision matrix (`configs/matrix_revision.yaml`, 86 runs; analysed by `src/evalu
 | T2 | FedProx μ ∈ {0, 1e-4}, HA-FedProx μ0 ∈ {1e-3, 1e-4} | cluster | proximal grid down to zero |
 | E3, E4, E6, E8, E10, E12 | as main matrix | as main matrix | two extra seeds (45, 46) |
 
+Second revision (`configs/matrix_revision2.yaml`, 48 runs, then `configs/matrix_revision2_opt.yaml`, 48 runs):
+
+| ID | Arm | Partition | Notes |
+|---|---|---|---|
+| E20 | FedAvg | random homes and `window_iid`, K ∈ {20, 50, 100} | to a plateau: up to 500 rounds, stop after 50 rounds without a new best |
+| E21 | client-only + FT | random, K ∈ {5, 20} | as E17, then one epoch of per-home fine-tuning (`fed.finetune_epochs`) |
+| E22 | FedAvg, client Adam state kept | random K = 20; one home per client | `fed.client_optimizer: adam_keep`; 100 rounds, patience 25 |
+| E23 | FedAvg, client SGD / FedAdam | random K = 20; one home per client | `fed.client_optimizer: sgd` (`fed.client_lr`), `fed.server_optimizer: adam` (`fed.server_lr`, `fed.server_tau`) |
+| T3 | step-size grid | random, K = 20, seed 42 | SGD lr ∈ {0.1, 0.3, 1.0}; FedAdam lr ∈ {0.001, 0.003, 0.01, 0.03}; chosen on validation MAE |
+| C43, C44 | FedAvg `window_iid`, K ∈ {5, 20, 100} | – | the IID control in both further cohorts |
+| main arms | E1, E2, E5, E10 (HA-FedProx, cluster), E13, E14, E15, E21 | as before | seeds 45, 46 |
+
 Budget: federated runs use 30 rounds × 1 local epoch, the same number of passes over the data
 as the centralised arm's 30-epoch cap. Each runs on 3 seeds (42, 43, 44); the seed changes model
 initialisation, client sampling, stragglers and random/Dirichlet groupings. The household cohort
 stays fixed. FedAvg-FT, where each household fine-tunes the final global model for one local
 epoch, is evaluated for every federated run and adds no communication.
 
-Statistics (`report.py`): paired Wilcoxon signed-rank tests on per-household test MAE (averaged
-over seeds) for the comparisons listed in `stats_tests.csv`, with Holm correction across the family.
+Statistics (`revision.py::run_level_tests`, used in the paper): the training run is the unit of
+replication. Each comparison uses the pooled test MAE of each run, paired by seed (paired t-test) where
+both arms share seeds and Welch's t-test otherwise; for a balanced design this equals the arm test of a
+linear mixed model with crossed household and run effects. One Holm correction covers the whole family
+(`results/metrics/revision/run_level_tests.csv`). The household-level Wilcoxon tests of `report.py`
+(`stats_tests.csv`) are kept for reference but not used in the paper, because households scored by one
+model are not independent.
 
-Clients are stateless: every local update builds a fresh Adam optimiser from the received global
-weights, so no optimiser moments survive between rounds. Local-only and client-only models train for
+By default clients are stateless: every local update builds a fresh Adam optimiser from the received
+global weights, so no optimiser moments survive between rounds (`fed.client_optimizer: adam`). The
+alternatives `adam_keep`, `sgd` and the server optimiser `fed.server_optimizer: adam` (FedAdam, Reddi et
+al. 2021: β1 0.9, β2 0.99) were added for the second revision. A run whose validation error is never
+finite (a diverged step size) is recorded rather than crashing. Local-only and client-only models train for
 at most 30 epochs with early stopping on validation MAE (patience 4).
 
 ## 11. Reproducibility

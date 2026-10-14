@@ -269,7 +269,7 @@ src/
   experiments/  run_baselines · run_fedavg · run_fedprox · run_matrix · run_demo · make_report · common
 results/      metrics/ · plots/ · logs/ · demo/ (synthetic only)
 paper/        manuscript.tex · sections/ · refs.bib · generated/ · figures/ · LITERATURE_NOTES.md
-  docx/       template.docx · content.tex (12 pages) · content_supp.tex · content_long.tex · build_docx.py · response.py · workflow_figure.py
+  docx/       template.docx · content.tex (12 pages) · content_supp.tex · content_long.tex · build_docx.py · response.py (first review, frozen) · response2.py · workflow_figure.py
 docs/         TECHNICAL.md
 tests/        test_core.py
 ```

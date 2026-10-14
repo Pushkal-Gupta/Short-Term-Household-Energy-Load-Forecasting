@@ -119,16 +119,25 @@ def _tabular(path, cols, rows, align):
     path.write_text("\n".join(lines) + "\n")
 
 
-def _first_hit(h, thr):
-    hit = h[h["val_mae"] <= thr]
-    return (int(hit["round"].iloc[0]), float(hit["cumulative_bytes"].iloc[0]) / 1e6) if len(hit) else (np.nan, np.nan)
+def _first_hit(h, thr, horizon=None):
+    """R@eps / B@eps: the first round after which validation MAE STAYS within thr for the rest of the run
+    (up to `horizon` rounds), and the megabytes exchanged up to it. NaN if the last round is above thr, and also
+    if only the last round qualifies: one round within thr cannot show that the run stays there."""
+    h = h if horizon is None else h[h["round"] <= horizon]
+    above = h["val_mae"].to_numpy() > thr
+    if not len(h) or above[-1]:
+        return np.nan, np.nan
+    idx = 0 if not above.any() else int(np.nonzero(above)[0][-1]) + 1
+    if idx == len(h) - 1:
+        return np.nan, np.nan
+    return int(h["round"].iloc[idx]), float(h["cumulative_bytes"].iloc[idx]) / 1e6
 
 
 # ───────────────────────────── analyses ─────────────────────────────
 
 def budget(R, rundir, out, gen, figs, central_test):
     rows, tab = [], []
-    tw = float(R["train_windows"].dropna().iloc[0])
+    tw = float(_sel(R, "E2_centralized")["train_windows"].iloc[0])     # main cohort
     for K, name in FED_K.items():
         s = _sel(R, name)
         steps = math.ceil(tw / K / 256)
@@ -150,14 +159,18 @@ def budget(R, rundir, out, gen, figs, central_test):
             _m(f"Long{k}Gap", r["gap_long"], "{:.1f}")
             _m(f"Long{k}Best", r["best_long"], "{:.0f}")
             _m(f"Long{k}Run", r["rounds_run"], "{:.0f}")
+            Ls = L.sort_values("seed")
+            M[f"RvLong{k}BestSeeds"] = ", ".join(str(int(v)) for v in Ls["best_round"])
+            M[f"RvLong{k}RunSeeds"] = ", ".join(str(int(v)) for v in Ls["rounds_run"])
+            _m(f"Long{k}MB", L["total_bytes"].mean() / 1e6, "{:,.0f}")
         tab.append([K, f"{steps:,}", f"{r['best30']:.1f}", f"{r['mae30']:.4f}", _signed(r["gap30"]),
-                    "--" if K not in LONG_K else f"{r['best_long']:.0f} / {r['rounds_run']:.0f}",
+                    "--" if K not in LONG_K else f"{M[f'RvLong{k}BestSeeds']} / {M[f'RvLong{k}RunSeeds']}",
                     "--" if K not in LONG_K else f"{r['mae_long']:.4f}",
                     "--" if K not in LONG_K else _signed(r["gap_long"])])
     df = pd.DataFrame(rows)
     df.to_csv(out / "budget.csv", index=False)
     _tabular(gen / "rev_budget.tex", ["$K$", "Steps/round", "Best rd. (30)", "MAE (30)", "Gap (\\%)",
-                                       "Best / run (100)", "MAE (100)", "Gap (\\%)"], tab, "rrrrrrrr")
+                                       "Best / run per seed (100)", "MAE (100)", "Gap (\\%)"], tab, "rrrrrlrr")
     # figure: validation MAE per round, every K (30 rounds) and the long runs
     fig, ax = plt.subplots(figsize=(6.4, 3.6))
     for c, (K, name) in zip(COLORS, FED_K.items()):
@@ -201,19 +214,32 @@ def window_control(R, out, gen, figs, central_test):
             _m(f"Win{k}HJS", r["H_JS_win"], "{:.4f}")
             _m(f"Win{k}Share", 100 * r["gap_win"] / r["gap_home"], "{:.0f}")
             _m(f"Home{k}Gap", r["gap_home"], "{:.1f}")
-        tab.append([K, f"{r['H_JS_home']:.4f}", f"{r['mae_home']:.4f}", _signed(r["gap_home"]),
-                    "--" if K not in WIN_K else f"{r['H_JS_win']:.5f}",
-                    "--" if K not in WIN_K else f"{r['mae_win']:.4f}",
-                    "--" if K not in WIN_K else _signed(r["gap_win"])])
+        pl = {}
+        for arm, nm in zip(("homes", "windows"), PLATEAU.get(K, (None, None))):
+            ps = _sel(R, nm) if nm else pd.DataFrame()
+            pl[arm] = 100 * (ps["test_mae"].mean() / central_test - 1) if len(ps) else np.nan
+        r["gap_home_plateau"], r["gap_win_plateau"] = pl["homes"], pl["windows"]
+        share = 100 * r["gap_win"] / r["gap_home"] if K in WIN_K else np.nan
+        tab.append([K, f"{r['H_JS_home']:.4f}", "--" if K not in WIN_K else f"{r['H_JS_win']:.4f}",
+                    _signed(r["gap_home"]), "--" if K not in WIN_K else _signed(r["gap_win"]),
+                    "--" if K not in WIN_K else f"{share:.0f}",
+                    _signed(pl["homes"]) if np.isfinite(pl["homes"]) else "--",
+                    _signed(pl["windows"]) if np.isfinite(pl["windows"]) else "--"])
     df = pd.DataFrame(rows)
     big = df[(df["K"] >= 20) & df["gap_win"].notna()]
     if len(big):
         sh = 100 * big["gap_win"] / big["gap_home"]
         _m("WinShareLo", sh.min(), "{:.0f}")
         _m("WinShareHi", sh.max(), "{:.0f}")
+        ratio = big["gap_win"] / (big["gap_home"] - big["gap_win"])
+        _m("FragRatioLo", ratio.min(), "{:.1f}")
+        _m("FragRatioHi", ratio.max(), "{:.1f}")
+    k5 = df[df["K"] == 5].iloc[0]
+    _m("FragRatioKfive", k5["gap_win"] / (k5["gap_home"] - k5["gap_win"]), "{:.1f}")
     df.to_csv(out / "window_control.csv", index=False)
-    _tabular(gen / "rev_window.tex", ["$K$", "$H_{JS}$, homes", "MAE, homes", "Gap (\\%)", "$H_{JS}$, windows",
-                                       "MAE, windows", "Gap (\\%)"], tab, "rrrrrrr")
+    _tabular(gen / "rev_window.tex", ["$K$", "$H_{JS}$, homes", "$H_{JS}$, windows", "Gap, homes (\\%)",
+                                       "Gap, windows (\\%)", "Share (\\%)", "Plateau gap, homes (\\%)",
+                                       "Plateau gap, windows (\\%)"], tab, "rrrrrrrr")
     fig, ax = plt.subplots(figsize=(5.6, 3.4))
     ax.errorbar(df["K"], df["mae_home"], yerr=df["sd_home"], marker="o", color=COLORS[1], capsize=3,
                 label="homes grouped at random")
@@ -221,11 +247,13 @@ def window_control(R, out, gen, figs, central_test):
     d2 = pd.concat([df[df["K"] == 1].assign(mae_win=df.loc[df["K"] == 1, "mae_home"], sd_win=df.loc[df["K"] == 1, "sd_home"]), d2])
     ax.errorbar(d2["K"], d2["mae_win"], yerr=d2["sd_win"], marker="s", color=COLORS[0], capsize=3, ls="--",
                 label="windows dealt at random (IID control)")
-    lk = [(K, _sel(R, n)["test_mae"]) for K, n in LONG_K.items()]
-    lk = [(K, v) for K, v in lk if len(v)]
-    if lk:
-        ax.errorbar([K * 1.06 for K, _ in lk], [v.mean() for _, v in lk], yerr=[v.std() for _, v in lk], marker="^",
-                    color=COLORS[2], capsize=3, ls=":", label="homes grouped at random, up to 100 rounds")
+    for j, (arm, mk, c, lab) in enumerate((("homes", "^", COLORS[1], "homes, at the plateau"),
+                                            ("windows", "D", COLORS[0], "windows, at the plateau"))):
+        pk = [(K, _sel(R, PLATEAU[K][j])["test_mae"]) for K in PLATEAU]
+        pk = [(K, v) for K, v in pk if len(v)]
+        if pk:
+            ax.errorbar([K * 1.07 for K, _ in pk], [v.mean() for _, v in pk], yerr=[v.std() for _, v in pk], marker=mk,
+                        color=c, mfc=c, capsize=3, ls=":", label=lab)
     ax.axhline(central_test, color="k", ls=":", lw=1, label="centralised")
     ax.set_xscale("log")
     ax.set_xticks([1, 5, 20, 50, 100])
@@ -277,6 +305,35 @@ def regression(R, out):
         _m("RegHJSRangeLo", g20.min(), "{:.4f}")
         _m("RegHJSRangeHi", g20.max(), "{:.4f}")
     _m("RegRtwo", r2, "{:.2f}")
+    # model 2: + indicator for homes (1) versus windows (0); model 3: home groupings at K = 20 only
+    d = d.assign(homes=(~d["experiment"].isin(WIN_K.values())).astype(float))
+    rows2 = []
+    for label, dd, cols in (("lnK+HJS+homes", d, ["lnK", "H_JS", "homes"]),
+                            ("K20 homes: HJS", d[(d["num_clients"] == 20) & (d["homes"] == 1)], ["H_JS"])):
+        Xd = {"lnK": np.log(dd["num_clients"].astype(float)), "H_JS": dd["H_JS"].astype(float), "homes": dd["homes"]}
+        X2 = np.column_stack([np.ones(len(dd))] + [Xd[c] for c in cols])
+        y2 = dd["test_mae"].to_numpy(float)
+        b2, *_ = np.linalg.lstsq(X2, y2, rcond=None)
+        e2 = y2 - X2 @ b2
+        n2, p2 = X2.shape
+        se2 = np.sqrt(np.diag(e2 @ e2 / (n2 - p2) * np.linalg.inv(X2.T @ X2)))
+        t2 = stats.t.ppf(0.975, n2 - p2)
+        pv2 = 2 * stats.t.sf(np.abs(b2 / se2), n2 - p2)
+        for term, b_, s_, p_ in zip(["const"] + cols, b2, se2, pv2):
+            rows2.append({"model": label, "term": term, "coef": b_, "ci_lo": b_ - t2 * s_, "ci_hi": b_ + t2 * s_,
+                          "p": p_, "n": n2})
+            if term == "const":
+                continue
+            k = _key(f"Reg{'Two' if label.startswith('lnK') else 'Kt'}{term}")
+            _m(k, b_ * 1e3, "{:.1f}" if term != "lnK" else "{:.2f}")
+            _m(k + "lo", (b_ - t2 * s_) * 1e3, "{:.1f}" if term != "lnK" else "{:.2f}")
+            _m(k + "hi", (b_ + t2 * s_) * 1e3, "{:.1f}" if term != "lnK" else "{:.2f}")
+            M["Rv" + k + "P"] = _p(p_)
+        _m(_key(f"Reg{'Two' if label.startswith('lnK') else 'Kt'}N"), n2, "{:d}")
+    pd.DataFrame(rows2).to_csv(out / "regression_extra.csv", index=False)
+    # correlation between ln K and H_JS among the home groupings (why the pooled fit finds both terms)
+    hd = d[d["homes"] == 1]
+    _m("RegCorrKH", float(np.corrcoef(np.log(hd["num_clients"].astype(float)), hd["H_JS"])[0, 1]), "{:.2f}")
     return out_df
 
 
@@ -297,7 +354,7 @@ def heterogeneity(R, rundir, out, gen, figs, central_vals):
                 if h is None:
                     continue
                 thr = (1 + e / 100) * cvs.get(run["seed"], cv_mean)
-                rr, mb = _first_hit(h, thr)
+                rr, mb = _first_hit(h, thr, 30)
                 if np.isfinite(mb):
                     reached += 1
                     b.append(mb)
@@ -320,6 +377,10 @@ def heterogeneity(R, rundir, out, gen, figs, central_vals):
         _m(f"Het{k}N", n, "{:d}")
         for e in EPS:
             _m(f"Het{k}B{e}", r[f"B{e}"], "{:.1f}")
+            v = r[f"B{e}_vals"]
+            _m(f"Het{k}B{e}Lo", min(v) if v else np.nan, "{:.1f}")
+            _m(f"Het{k}B{e}Hi", max(v) if v else np.nan, "{:.1f}")
+            _m(f"Het{k}B{e}N", r[f"B{e}_n"], "{:d}")
         _m(f"Het{k}Excess", r["excess"], "{:.1f}")
         tab.append([label, n, f"{r['H_JS']:.4f}", f"{r['H_CV']:.3f}", f"{mae:.4f} $\\pm$ {ci:.4f}"]
                    + [f"{r[f'B{e}']:.1f} ({r[f'B{e}_n']}/{n})" if np.isfinite(r[f"B{e}"]) else f"-- (0/{n})" for e in (5, 10, 20)]
@@ -338,7 +399,12 @@ def heterogeneity(R, rundir, out, gen, figs, central_vals):
     M["RvHetSpearmanP"] = _p(p)
     _m("HetSpearmanN", len(k20), "{:d}")
     lo, hi = df[~df["grouping"].str.startswith("window")]["mae"].agg(["min", "max"])
-    _m("HetMaxDiff", hi - lo)
+    _m("HetMaxDiff", round(hi, 4) - round(lo, 4))
+    _m("HetMaeLo", lo)
+    _m("HetMaeHi", hi)
+    homes_ex = df[~df["grouping"].str.startswith("window")]["excess"]
+    _m("HetExcessHomeLo", homes_ex.min(), "{:.1f}")
+    _m("HetExcessHomeHi", homes_ex.max(), "{:.1f}")
     rnd, clu = df.set_index("grouping").loc["random"], df.set_index("grouping").loc["cluster"]
     _m("HetBepsIncrease", 100 * (clu["B10"] / rnd["B10"] - 1), "{:.0f}")
     # figure: (a) validation curves per grouping, (b) B@eps against eps
@@ -664,7 +730,354 @@ def precision_and_partial(R, rundir, out):
         M[f"RvPrec{k}P"] = _p(r.get("p", np.nan))
         _m(f"Prec{k}SeedsBetter", r["seeds_better"], "{:d}")
         _m(f"Prec{k}SeedsN", r["seeds_n"], "{:d}")
+        _m(f"Prec{k}Rel", 100 * (m / _sel(R, "E4_fedavg_moderate")["test_mae"].mean() - 1), "{:+.1f}")
     pd.DataFrame(rows).to_csv(out / "precision_partial.csv", index=False)
+
+
+# ───────────────────────────── second revision ─────────────────────────────
+
+PLATEAU = {20: ("E20_homes_K20_plateau", "E20_windows_K20_plateau"),
+           50: ("E20_homes_K50_plateau", "E20_windows_K50_plateau"),
+           100: ("E20_homes_K100_plateau", "E20_windows_K100_plateau")}
+OPTIMISERS = [("Adam, reset each round", "E18_fedavg_K{K}_long"), ("Adam, state kept", "E22_adamkeep_homes_K{K}"),
+              ("SGD", "E23_sgd_homes_K{K}"), ("FedAdam (server)", "E23_FEDADAM_homes_K{K}")]
+# FEDADAM is replaced by the run family whose server step size won the T3 grid on validation MAE.
+# Run-level comparisons: (key, label A, run A, column A, label B, run B, column B). Column ft_mae = after local FT.
+COMPARISONS = [
+    ("CenLoc", "Centralised", "E2_centralized", "mae", "Local-only", "E1_local", "mae"),
+    ("KoneCen", "FedAvg, K=1", "E14_fedavg_K1", "mae", "Centralised", "E2_centralized", "mae"),
+    ("KtwentyCen", "FedAvg, K=20", "E3_fedavg_iid", "mae", "Centralised", "E2_centralized", "mae"),
+    ("KhundredCen", "FedAvg, K=100", "E13_fedavg_household", "mae", "Centralised", "E2_centralized", "mae"),
+    ("WinHomeKtwenty", "Windows, K=20", "E15_fedavg_window_K20", "mae", "Homes, K=20", "E3_fedavg_iid", "mae"),
+    ("WinHomeKhundred", "Windows, K=100", "E15_fedavg_window_K100", "mae", "Homes, K=100", "E13_fedavg_household", "mae"),
+    ("CluRnd", "FedAvg, cluster", "E6_fedavg_strong", "mae", "FedAvg, random", "E3_fedavg_iid", "mae"),
+    ("ShapeRnd", "FedAvg, shape", "E16_fedavg_shape", "mae", "FedAvg, random", "E3_fedavg_iid", "mae"),
+    ("ProxAvg", "FedProx, α=0.3", "E5_fedprox_moderate", "mae", "FedAvg, α=0.3", "E4_fedavg_moderate", "mae"),
+    ("HaAvg", "HA-FedProx, cluster", "E10_hafedprox_strong", "mae", "FedAvg, cluster", "E6_fedavg_strong", "mae"),
+    ("Fponesix", "FedAvg, α=0.3, 16-bit", "E12_fedavg_fp16_moderate", "mae", "FedAvg, α=0.3", "E4_fedavg_moderate", "mae"),
+    ("Partial", "FedAvg, α=0.3, C=0.5", "E8_fedavg_partial", "mae", "FedAvg, α=0.3", "E4_fedavg_moderate", "mae"),
+    ("FedCliKfive", "FedAvg, K=5", "E14_fedavg_K5", "mae", "Client-only, K=5", "E21_clientlocal_ft_K5", "mae"),
+    ("FedCliKtwenty", "FedAvg, K=20", "E3_fedavg_iid", "mae", "Client-only, K=20", "E21_clientlocal_ft_K20", "mae"),
+    ("FedCliFTKfive", "FedAvg + FT, K=5", "E14_fedavg_K5", "ft_mae", "Client-only + FT, K=5", "E21_clientlocal_ft_K5", "ft_mae"),
+    ("FedCliFTKtwenty", "FedAvg + FT, K=20", "E3_fedavg_iid", "ft_mae", "Client-only + FT, K=20", "E21_clientlocal_ft_K20", "ft_mae"),
+    ("ModFTLoc", "FedAvg + FT, α=0.3", "E4_fedavg_moderate", "ft_mae", "Local-only", "E1_local", "mae"),
+    ("KhundredLoc", "FedAvg, K=100", "E13_fedavg_household", "mae", "Local-only", "E1_local", "mae"),
+    ("KhundredFTLoc", "FedAvg + FT, K=100", "E13_fedavg_household", "ft_mae", "Local-only", "E1_local", "mae"),
+    ("PlWinHomeKtwenty", "Windows, K=20, plateau", "E20_windows_K20_plateau", "mae", "Homes, K=20, plateau", "E20_homes_K20_plateau", "mae"),
+    ("PlWinHomeKfifty", "Windows, K=50, plateau", "E20_windows_K50_plateau", "mae", "Homes, K=50, plateau", "E20_homes_K50_plateau", "mae"),
+    ("PlWinHomeKhundred", "Windows, K=100, plateau", "E20_windows_K100_plateau", "mae", "Homes, K=100, plateau", "E20_homes_K100_plateau", "mae"),
+    ("PlWinCenKtwenty", "Windows, K=20, plateau", "E20_windows_K20_plateau", "mae", "Centralised", "E2_centralized", "mae"),
+    ("PlWinCenKhundred", "Windows, K=100, plateau", "E20_windows_K100_plateau", "mae", "Centralised", "E2_centralized", "mae"),
+    ("PlHomeCenKhundred", "Homes, K=100, plateau", "E20_homes_K100_plateau", "mae", "Centralised", "E2_centralized", "mae"),
+    ("KeepKtwenty", "Adam kept, K=20", "E22_adamkeep_homes_K20", "mae", "Adam reset, K=20", "E18_fedavg_K20_long", "mae"),
+    ("KeepKhundred", "Adam kept, K=100", "E22_adamkeep_homes_K100", "mae", "Adam reset, K=100", "E18_fedavg_K100_long", "mae"),
+    ("SgdKtwenty", "SGD, K=20", "E23_sgd_homes_K20", "mae", "Adam reset, K=20", "E18_fedavg_K20_long", "mae"),
+    ("SgdKhundred", "SGD, K=100", "E23_sgd_homes_K100", "mae", "Adam reset, K=100", "E18_fedavg_K100_long", "mae"),
+    ("FedAdamKtwenty", "FedAdam, K=20", "E23_FEDADAM_homes_K20", "mae", "Adam reset, K=20", "E18_fedavg_K20_long", "mae"),
+    ("FedAdamKhundred", "FedAdam, K=100", "E23_FEDADAM_homes_K100", "mae", "Adam reset, K=100", "E18_fedavg_K100_long", "mae"),
+]
+
+
+def _grid(R):
+    """Step-size grid (T3_*, seed 42, K = 20): validation MAE per optimiser and step size."""
+    g = R[R["experiment"].str.startswith("T3_")]
+    rows = []
+    for _, r in g.iterrows():
+        kind, lr = r["experiment"][3:].split("_lr")
+        rows.append({"kind": kind, "lr": float(lr), "val": r["best_val_mae"]})
+    return pd.DataFrame(rows, columns=["kind", "lr", "val"]).sort_values(["kind", "lr"])
+
+
+def _fedadam(R):
+    """Run-family infix of FedAdam at the grid-selected server step size (0.01 is the unsuffixed family)."""
+    g = _grid(R)
+    g = g[(g["kind"] == "fedadam") & g["val"].notna()]
+    lr = 0.01 if g.empty else float(g.sort_values("val").iloc[0]["lr"])
+    return "fedadam" if lr == 0.01 else f"fedadam{lr:g}"
+
+
+def _hh_seed(rundir, name, col):
+    """Per (household, seed) MAE of one run family; col = mae or ft_mae."""
+    out = {}
+    for f in sorted(rundir.glob(f"{name}__seed*_households.csv")):
+        d = pd.read_csv(f)
+        if col in d:
+            out[int(f.name.split("__seed")[1].split("_")[0])] = d.set_index("LCLid")[col]
+    return out
+
+
+def _run_value(R, name, col):
+    s = _sel(R, name)
+    c = "test_mae" if col == "mae" else "ft_mae"
+    return s.set_index("seed")[c].dropna() if c in s else pd.Series(dtype=float)
+
+
+def _holm(p):
+    p = np.asarray(p, float)
+    ok = np.isfinite(p)
+    out = np.full_like(p, np.nan)
+    idx = np.argsort(np.where(ok, p, np.inf))
+    m, running = ok.sum(), 0.0
+    for rank, i in enumerate(idx[:m]):
+        running = max(running, min(1.0, (m - rank) * p[i]))
+        out[i] = running
+    return out
+
+
+def run_level_tests(R, rundir, out, gen):
+    """Tests with the training run, not the household, as the unit of replication.
+
+    Households evaluated under one trained model are not independent, so each comparison uses the pooled test
+    MAE of each run. Where both arms have the same seeds, differences are paired by seed (paired t-test);
+    otherwise Welch's t-test. With every household in every run, this equals the test of the arm effect in a
+    linear mixed model with crossed random effects for household and run. Holm's correction is applied over the
+    whole family. The share of households better under A is reported as a descriptive statistic only.
+    """
+    rows = []
+    fa = _fedadam(R)
+    for key, la, na, ca, lb, nb, cb in COMPARISONS:
+        na, nb = na.replace("FEDADAM", fa), nb.replace("FEDADAM", fa)
+        a, b = _run_value(R, na, ca), _run_value(R, nb, cb)
+        r = {"key": key, "A": la, "B": lb, "n_A": len(a), "n_B": len(b)}
+        common = a.index.intersection(b.index)
+        if len(a) < 2 or len(b) < 2:
+            r.update(diff=np.nan, lo=np.nan, hi=np.nan, p=np.nan, test="--")
+        elif len(common) >= 2:
+            d = (a.loc[common] - b.loc[common]).to_numpy()
+            m, h, n = _ci(d)
+            r.update(diff=m, lo=m - h, hi=m + h, p=float(stats.ttest_1samp(d, 0).pvalue) if np.std(d) > 0 else np.nan,
+                     test=f"paired, n={n}", seeds_better=int((d < 0).sum()), seeds_n=n)
+        else:
+            t = stats.ttest_ind(a, b, equal_var=False)
+            dm = a.mean() - b.mean()
+            se = math.sqrt(a.var(ddof=1) / len(a) + b.var(ddof=1) / len(b))
+            df_ = se ** 4 / ((a.var(ddof=1) / len(a)) ** 2 / (len(a) - 1) + (b.var(ddof=1) / len(b)) ** 2 / (len(b) - 1))
+            q = stats.t.ppf(0.975, df_)
+            r.update(diff=dm, lo=dm - q * se, hi=dm + q * se, p=float(t.pvalue), test=f"Welch, {len(a)}+{len(b)}",
+                     seeds_better=np.nan, seeds_n=np.nan)
+        ha, hb = _hh_seed(rundir, na, ca), _hh_seed(rundir, nb, cb)
+        if ha and hb:
+            A = pd.concat(ha.values(), axis=1).mean(axis=1)
+            B = pd.concat(hb.values(), axis=1).mean(axis=1)
+            j = A.index.intersection(B.index)
+            r["hh_better"] = 100 * float((A.loc[j] < B.loc[j]).mean())
+        rows.append(r)
+    df = pd.DataFrame(rows)
+    df["p_holm"] = _holm(df["p"].to_numpy())
+    df.to_csv(out / "run_level_tests.csv", index=False)
+    tab = []
+    for _, r in df.iterrows():
+        k = r["key"]
+        _m(f"Ts{k}Diff", r["diff"] * 1e4, "{:+.1f}")
+        _m(f"Ts{k}Lo", r["lo"] * 1e4, "{:+.1f}")
+        _m(f"Ts{k}Hi", r["hi"] * 1e4, "{:+.1f}")
+        M[f"RvTs{k}P"] = _p(r["p_holm"])
+        _m(f"Ts{k}HH", r.get("hh_better", np.nan), "{:.0f}")
+        if np.isfinite(r.get("seeds_n", np.nan)):
+            M[f"RvTs{k}Seeds"] = f"{int(r['seeds_better'])} of {int(r['seeds_n'])}"
+        if not np.isfinite(r["diff"]):
+            continue
+        tab.append([r["A"], r["B"], r["test"], f"{1e4 * r['diff']:+.1f} [{1e4 * r['lo']:+.1f}, {1e4 * r['hi']:+.1f}]",
+                    f"{r.get('hh_better', np.nan):.0f}", _p(r["p_holm"]).replace("$=", "$")])
+    for row in tab:
+        row[3] = row[3].replace("-", "−")
+    _tabular(gen / "rev_stats.tex", ["A", "B", "Test (runs)", "$\\Delta$MAE A$-$B ($10^{-4}$ kWh) [95\\% CI]",
+                                      "Homes A better (\\%)", "$p_{\\mathrm{Holm}}$"], tab, "lllrrr")
+    _m("TsFamily", len(tab), "{:d}")
+    return df
+
+
+def _transient_rise(h, upto=10):
+    """Largest rise of validation MAE above its running minimum within the first `upto` rounds (%)."""
+    v = h[h["round"] <= upto]["val_mae"].to_numpy()
+    if len(v) < 2:
+        return np.nan
+    run_min = np.minimum.accumulate(v)
+    return 100 * float(np.max(v[1:] / run_min[:-1] - 1).clip(min=0))
+
+
+def plateau(R, rundir, out, gen, figs, central_test, central_val):
+    rows, tab = [], []
+    for K, (hn, wn) in PLATEAU.items():
+        for arm, nm in (("homes", hn), ("windows", wn)):
+            s = _sel(R, nm).sort_values("seed")
+            if s.empty:
+                continue
+            r = {"K": K, "arm": arm, "n": len(s), "mae": s["test_mae"].mean(), "sd": s["test_mae"].std(),
+                 "best": ", ".join(str(int(v)) for v in s["best_round"]),
+                 "run": ", ".join(str(int(v)) for v in s["rounds_run"]),
+                 "mb_best": s["bytes_to_best_round"].mean() / 1e6, "mb_total": s["total_bytes"].mean() / 1e6,
+                 "hit_cap": int((s["rounds_run"] >= s["rounds"]).sum())}
+            r["gap"] = 100 * (r["mae"] / central_test - 1)
+            rows.append(r)
+            k = _key(f"Pl{arm}K{K}").replace("Kfivezero", "Kfifty").replace("Ktwozero", "Ktwenty").replace("Konezerozero", "Khundred")
+            _m(f"{k}MAE", r["mae"])
+            _m(f"{k}Gap", r["gap"], "{:.1f}")
+            M[f"Rv{k}Best"] = r["best"]
+            M[f"Rv{k}Run"] = r["run"]
+            _m(f"{k}MBbest", r["mb_best"], "{:,.0f}")
+            _m(f"{k}MBtotal", r["mb_total"], "{:,.0f}")
+            _m(f"{k}Cap", r["hit_cap"], "{:d}")
+            tab.append([K, arm, r["n"], r["best"], r["run"], f"{r['mae']:.4f} $\\pm$ {r['sd']:.4f}", _signed(r["gap"]),
+                        f"{r['mb_best']:,.0f}", f"{r['mb_total']:,.0f}"])
+    df = pd.DataFrame(rows)
+    df.to_csv(out / "plateau.csv", index=False)
+    if df.empty:
+        return df
+    _tabular(gen / "rev_plateau.tex", ["$K$", "Clients", "Seeds", "Best round (per seed)", "Rounds run",
+                                        "Test MAE", "Gap (\\%)", "MB to best", "MB total"], tab, "rlrllrrrr")
+    piv = df.pivot(index="K", columns="arm", values="gap")
+    if {"homes", "windows"} <= set(piv.columns):
+        sh = 100 * piv["windows"] / piv["homes"]
+        _m("PlShareLo", sh.min(), "{:.0f}")
+        _m("PlShareHi", sh.max(), "{:.0f}")
+        _m("PlWinGapLo", piv["windows"].min(), "{:.1f}")
+        _m("PlWinGapHi", piv["windows"].max(), "{:.1f}")
+        _m("PlHomeGapLo", piv["homes"].min(), "{:.1f}")
+        _m("PlHomeGapHi", piv["homes"].max(), "{:.1f}")
+        g30 = pd.Series({K: 100 * (_sel(R, FED_K[K])["test_mae"].mean() / central_test - 1) for K in piv.index})
+        removed = 100 * (1 - piv["homes"] / g30)
+        _m("PlRemovedLo", removed.min(), "{:.0f}")
+        _m("PlRemovedHi", removed.max(), "{:.0f}")
+    # figure: validation MAE against rounds and against megabytes
+    fig, axs = plt.subplots(1, 2, figsize=(9.6, 3.5), sharey=True)
+    for c, (K, (hn, wn)) in zip(COLORS, PLATEAU.items()):
+        for nm, ls, lab in ((hn, "-", f"homes, K={K}"), (wn, "--", f"windows, K={K}")):
+            hs = [h for sd in range(42, 47) if (h := _hist(rundir, nm, sd)) is not None]
+            if not hs:
+                continue
+            H = pd.concat(hs).groupby("round")[["val_mae", "cumulative_bytes"]].mean()
+            H = H[pd.concat(hs).groupby("round").size() == len(hs)]      # rounds that every seed reached
+            axs[0].plot(H.index, H["val_mae"], ls, color=c, lw=1.3, label=lab)
+            axs[1].plot(H["cumulative_bytes"] / 1e6, H["val_mae"], ls, color=c, lw=1.3)
+    for ax in axs:
+        ax.axhline(central_val, color="k", ls=":", lw=1)
+        ax.set_xscale("log")
+        ax.grid(alpha=0.25)
+    axs[0].set_ylim(central_val * 0.97, central_val * 1.25)
+    axs[0].set_xlabel("Round")
+    axs[0].set_ylabel("Validation MAE (kWh)")
+    axs[1].set_xlabel("Megabytes exchanged")
+    axs[0].legend(fontsize=7, frameon=False, ncol=2)
+    axs[0].text(-0.13, 1.04, "(a)", transform=axs[0].transAxes, va="bottom", fontweight="bold")
+    axs[1].text(-0.06, 1.04, "(b)", transform=axs[1].transAxes, va="bottom", fontweight="bold")
+    fig.tight_layout()
+    fig.savefig(figs / "revision_plateau.png", dpi=300)
+    plt.close(fig)
+    return df
+
+
+def optimisers(R, rundir, out, gen, central_test):
+    rows, tab = [], []
+    for K in (20, 100):
+        sel = _fedadam(R)
+        other = "fedadam0.03" if sel == "fedadam" else "fedadam"
+        olr = "0.03" if sel == "fedadam" else "0.01"
+        for label, pat in OPTIMISERS + [(f"FedAdam, step {olr} (not selected)", "E23_OTHER_homes_K{K}")]:
+            nm = pat.format(K=K).replace("FEDADAM", sel).replace("OTHER", other)
+            s = _sel(R, nm)
+            if s.empty:
+                continue
+            rise = [_transient_rise(h) for sd in s["seed"] if (h := _hist(rundir, nm, sd)) is not None]
+            r = {"K": K, "optimiser": label, "n": len(s), "mae": s["test_mae"].mean(), "sd": s["test_mae"].std(),
+                 "best": s["best_round"].mean(), "rise": float(np.nanmean(rise)) if rise else np.nan}
+            r["gap"] = 100 * (r["mae"] / central_test - 1)
+            rows.append(r)
+            k = _key(f"Opt{label.split()[0].split(',')[0]}{'Keep' if 'kept' in label else ''}"
+                     f"{'Other' if 'not selected' in label else ''}K{K}")
+            _m(f"{k}MAE", r["mae"])
+            _m(f"{k}Gap", r["gap"], "{:.1f}")
+            _m(f"{k}Rise", r["rise"], "{:.1f}")
+            _m(f"{k}Best", r["best"], "{:.0f}")
+            tab.append([K, label, r["n"], f"{r['best']:.0f}", f"{r['mae']:.4f} $\\pm$ {r['sd']:.4f}", _signed(r["gap"]),
+                        f"{r['rise']:.1f}"])
+    df = pd.DataFrame(rows)
+    df.to_csv(out / "optimisers.csv", index=False)
+    if len(df):
+        _tabular(gen / "rev_optimisers.tex", ["$K$", "Optimiser", "Seeds", "Best round", "Test MAE", "Gap (\\%)",
+                                               "Early rise (\\%)"], tab, "rlrrrrr")
+    # the early rise of the K = 20 groupings (Fig. 3a)
+    home_rise, home_rho = [], []
+    for label, name in GROUPINGS:
+        s = _sel(R, name)
+        rise = [_transient_rise(h) for sd in s["seed"] if (h := _hist(rundir, name, sd)) is not None]
+        rho = [float(h[h["round"].between(2, 5)]["update_disagreement_rho"].mean())
+               for sd in s["seed"] if (h := _hist(rundir, name, sd)) is not None]
+        k = _key(label.split(" ")[0].replace("α=", "a"))
+        _m(f"Rise{k}", float(np.mean(rise)) if rise else np.nan, "{:.1f}")
+        _m(f"RhoEarly{k}", float(np.mean(rho)) if rho else np.nan, "{:.2f}")
+        if not label.startswith("window") and rise:
+            home_rise.append(float(np.mean(rise)))
+            home_rho.append(float(np.mean(rho)))
+    if home_rise:
+        _m("RiseHomeLo", min(home_rise), "{:.1f}")
+        _m("RiseHomeHi", max(home_rise), "{:.1f}")
+        _m("RhoEarlyHomeLo", min(home_rho), "{:.2f}")
+        _m("RhoEarlyHomeHi", max(home_rho), "{:.2f}")
+    # step-size grid
+    gt = _grid(R)
+    if len(gt):
+        gt.to_csv(out / "optimiser_grid.csv", index=False)
+        for kind in gt["kind"].unique():
+            b = gt[(gt["kind"] == kind) & gt["val"].notna()].sort_values("val").iloc[0]
+            _m(f"Grid{kind}Best", b["lr"], "{:g}")
+        _tabular(gen / "rev_optgrid.tex", ["Optimiser", "Step size", "Best validation MAE (kWh)"],
+                 [["Client SGD" if r.kind == "sgd" else "FedAdam (server)", f"{r.lr:g}",
+                   f"{r.val:.5f}" if np.isfinite(r.val) else "diverged"] for r in gt.itertuples()], "lrr")
+    return df
+
+
+def cohorts2(R, out, gen):
+    """Gaps to centralised in each cohort, homes and windows, with the cohort's own centralised arm."""
+    rows, tab = [], []
+    main_win = {5: "E15_fedavg_window_K5", 20: "E15_fedavg_window_K20", 100: "E15_fedavg_window_K100"}
+    for cohort, prefix in [("Main", None), ("Second", "C43"), ("Third", "C44")]:
+        def v(key, win=False, K=None):
+            if prefix is None:
+                nm = main_win[K] if win else MAIN_COHORT[key]
+            else:
+                nm = f"{prefix}_window_K{K}" if win else f"{prefix}_{key}"
+            s = _sel(R, nm)
+            return s["test_mae"].mean() if len(s) else np.nan
+        c = v("centralized")
+        r = {"cohort": cohort, "central": c, "local_gap": 100 * (v("local") / c - 1)}
+        for K in (5, 20, 100):
+            r[f"home{K}"] = 100 * (v(f"fedavg_K{K}") / c - 1)
+            r[f"win{K}"] = 100 * (v(None, True, K) / c - 1)
+            r[f"share{K}"] = 100 * r[f"win{K}"] / r[f"home{K}"]
+        rows.append(r)
+        tab.append([cohort, f"{c:.4f}", _signed(r["local_gap"])]
+                   + [f"{_signed(r[f'home{K}'])} / {_signed(r[f'win{K}'])}" for K in (5, 20, 100)])
+    df = pd.DataFrame(rows)
+    df.to_csv(out / "cohorts_windows.csv", index=False)
+    _tabular(gen / "rev_cohorts2.tex", ["Cohort", "Centralised MAE (kWh)", "Local-only gap (\\%)",
+                                         "$K=5$: homes / windows (\\%)", "$K=20$: homes / windows (\\%)",
+                                         "$K=100$: homes / windows (\\%)"], tab, "lrrrrr")
+    for K in (5, 20, 100):
+        k = {5: "Kfive", 20: "Ktwenty", 100: "Khundred"}[K]
+        for col in ("home", "win", "share"):
+            x = df[f"{col}{K}"]
+            _m(f"Co{col.title()}{k}Lo", x.min(), "{:.0f}" if col == "share" else "{:.1f}")
+            _m(f"Co{col.title()}{k}Hi", x.max(), "{:.0f}" if col == "share" else "{:.1f}")
+    big = pd.concat([df["share20"], df["share100"]])
+    _m("CoShareBigLo", big.min(), "{:.0f}")
+    _m("CoShareBigHi", big.max(), "{:.0f}")
+    return df
+
+
+def client_only_ft(R, out, central_test):
+    """Client-only training with the same one-epoch per-home fine-tuning as FedAvg + FT (rows of Table 1)."""
+    for K, nm in ((5, "E21_clientlocal_ft_K5"), (20, "E21_clientlocal_ft_K20")):
+        s = _sel(R, nm)
+        k = {5: "Kfive", 20: "Ktwenty"}[K]
+        ok = len(s) > 0
+        _m(f"CliFT{k}MAE", s["test_mae"].mean() if ok else np.nan)
+        _m(f"CliFT{k}MAEsd", s["test_mae"].std() if ok else np.nan)
+        _m(f"CliFT{k}RMSE", s["test_rmse"].mean() if ok else np.nan)
+        _m(f"CliFT{k}WAPE", s["test_wape"].mean() if ok else np.nan, "{:.1f}")
+        _m(f"CliFT{k}Gap", 100 * (s["test_mae"].mean() / central_test - 1) if ok else np.nan, "{:+.1f}")
+        _m(f"CliFT{k}FT", s["ft_mae"].mean() if ok and "ft_mae" in s else np.nan)
+        _m(f"CliFT{k}N", len(s), "{:d}")
 
 
 # ───────────────────────────── main ─────────────────────────────
@@ -693,6 +1106,11 @@ def build(cfg_path="configs/default.yaml"):
     equity_extras(R, rundir, out, gen)
     raw_bytes(R, cfg, out)
     precision_and_partial(R, rundir, out)
+    run_level_tests(R, rundir, out, gen)
+    plateau(R, rundir, out, gen, figs, central_test, cvs[1])
+    optimisers(R, rundir, out, gen, central_test)
+    cohorts2(R, out, gen)
+    client_only_ft(R, out, central_test)
     _m("PersistenceMAE", persistence_mae)
     nv = _sel(R, "E0_naive").iloc[0]
     for k in ("persistence", "seasonal_naive"):
