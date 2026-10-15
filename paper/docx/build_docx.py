@@ -45,7 +45,7 @@ AFFILIATIONS = [("1", "School of Computer Science and Engineering, Vellore "
                       "Institute of Technology, Vellore 632014, Tamil Nadu, India")]
 CORRESPONDING = "* Corresponding author: Kalaavathi B, kalaavathi.b@vit.ac.in"
 EMAILS = "E-mail addresses: pushkal.gupta2023@vitstudent.ac.in (P. Gupta), vanka.kaushik2023@vitstudent.ac.in (V. Kaushik)"
-ORCID = ("ORCID: 0009-0004-7032-6847 (Pushkal Gupta), 0009-0003-0735-264X (Vanka Kaushik), "
+ORCID = ("ORCID: 0009-0004-7032-6847 (P. Gupta), 0009-0003-0735-264X (V. Kaushik),\n"
          "0000-0003-4027-3137 (Kalaavathi B)")
 KEYWORDS = ["federated learning", "load forecasting", "smart meters", "non-IID data", "communication efficiency",
             "personalisation", "Low Carbon London"]
@@ -344,12 +344,24 @@ def table_xml(spec: str, rows: list[list[str]], refs: Refs, prose: bool = False)
     def vis_len(c):
         return len(re.sub(r"\\[A-Za-z]+|[${}]", "", c))
 
-    weights = [max(7, min(30, max(vis_len(r[j]) for r in rows) + 2)) for j in range(ncol)]
+    def word_len(c):                                        # never split a word across lines
+        return max((len(w) for w in re.sub(r"\\[A-Za-z]+|[${}]", "", c).split()), default=0)
+
+    weights = [max(7, max(word_len(r[j]) for r in rows) + 3, min(30, max(vis_len(r[j]) for r in rows) + 2))
+               for j in range(ncol)]
     if prose:                                               # Table 1 (related work): even widths
         weights = [1.0, 1.25, 1.1, 1.15]
     tot = sum(weights)
     widths = [int(TEXT_WIDTH * w / tot) for w in weights]
     widths[-1] += TEXT_WIDTH - sum(widths)
+    if not prose:                                           # room for the longest word of each column
+        need = [int(max(word_len(r[j]) for r in rows) * size * 5.5) + 200 for j in range(ncol)]
+        short = sum(max(0, n - w) for n, w in zip(need, widths))
+        slack = [max(0, w - n) for n, w in zip(need, widths)]
+        if short and sum(slack) > short:
+            widths = [max(w, n) if n > w else w - int(short * s / sum(slack))
+                      for n, w, s in zip(need, widths, slack)]
+            widths[-1] += TEXT_WIDTH - sum(widths)
     border = ''.join(f'<w:{s} w:val="single" w:color="auto" w:sz="4" w:space="0"/>'
                      for s in ("top", "left", "bottom", "right", "insideH", "insideV"))
     xml = [f'<w:tbl {NS}><w:tblPr><w:tblStyle w:val="9"/><w:tblW w:w="{TEXT_WIDTH}" w:type="dxa"/>'
@@ -610,7 +622,8 @@ def build() -> Path:
                  f'<w:r><w:rPr><w:i/><w:iCs/><w:sz w:val="19"/><w:szCs w:val="19"/></w:rPr><w:t xml:space="preserve"> {escape(aff)}</w:t></w:r>',
                  '<w:spacing w:after="40"/><w:jc w:val="center"/>'))
     for line, after in ((CORRESPONDING, 40), (EMAILS, 40), (ORCID, 240)) if not SUPP else ((CORRESPONDING, 240),):
-        add(para(f'<w:r><w:rPr><w:i/><w:iCs/><w:sz w:val="19"/><w:szCs w:val="19"/></w:rPr><w:t>{escape(line)}</w:t></w:r>',
+        text = "</w:t><w:br/><w:t>".join(escape(s) for s in line.split("\n"))
+        add(para(f'<w:r><w:rPr><w:i/><w:iCs/><w:sz w:val="19"/><w:szCs w:val="19"/></w:rPr><w:t>{text}</w:t></w:r>',
                  f'<w:spacing w:after="{after}"/><w:jc w:val="center"/>'))
 
     for kind, payload in items:

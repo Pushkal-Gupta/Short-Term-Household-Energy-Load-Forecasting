@@ -40,7 +40,7 @@ to 100 rounds. Dotted: centralised.}\label{fig:budget}
 \end{figure}
 
 \section{Heterogeneity-adaptive proximal coefficient}
-The original submission proposed a rule that sets the proximal coefficient from the disagreement between client
+A rule was also tested that sets the proximal coefficient from the disagreement between client
 updates. After round $r$ the server holds the updates $\Delta_k=w_k-w_r$ and their weighted mean $\bar{\Delta}$, and
 computes
 \begin{equation}\label{eq:rho}
@@ -56,8 +56,7 @@ one, so a coefficient proportional to it grows late in training whatever the dat
 three aggregation rules for each grouping.
 
 \begin{table}
-\caption{All aggregation rules for each grouping at $K=20$ (mean $\pm$ s.d. over three to five seeds). $H$: composite index of the original
-submission; $\bar\rho$: mean update disagreement.}\label{tab:hetfull}
+\caption{All aggregation rules for each grouping at $K=20$ (mean $\pm$ s.d. over three to five seeds). $H=H_{\mathrm{JS}}+H_{\mathrm{CV}}/(1+H_{\mathrm{CV}})$, a composite shown for reference; $\bar\rho$: mean update disagreement.}\label{tab:hetfull}
 \input{generated/table_heterogeneity.tex}
 \end{table}
 

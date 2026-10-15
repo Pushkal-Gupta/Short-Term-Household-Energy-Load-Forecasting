@@ -1059,6 +1059,8 @@ def cohorts2(R, out, gen):
             x = df[f"{col}{K}"]
             _m(f"Co{col.title()}{k}Lo", x.min(), "{:.0f}" if col == "share" else "{:.1f}")
             _m(f"Co{col.title()}{k}Hi", x.max(), "{:.0f}" if col == "share" else "{:.1f}")
+    _m("CoLocalGapLo", df["local_gap"].min(), "{:.1f}")
+    _m("CoLocalGapHi", df["local_gap"].max(), "{:.1f}")
     big = pd.concat([df["share20"], df["share100"]])
     _m("CoShareBigLo", big.min(), "{:.0f}")
     _m("CoShareBigHi", big.max(), "{:.0f}")

@@ -183,7 +183,7 @@ H_{\mathrm{JS}}={\binom{K}{2}}^{-1}\sum_{k<l}\mathrm{JS}\left(q_k\Vert q_l\right
 \end{equation}
 $H_{\mathrm{JS}}$ measures differences in when clients consume. Differences in how much they consume were measured
 separately by the coefficient of variation of client mean load, $H_{\mathrm{CV}}$; the two were not combined, because a
-composite would be dominated by the level term (it made up \RvHcvShare{}\,\% of the earlier composite index).
+composite would be dominated by the level term (it made up \RvHcvShare{}\,\% of $H_{\mathrm{JS}}+H_{\mathrm{CV}}/(1+H_{\mathrm{CV}})$; Supplementary Table S3).
 
 \textbf{Communication.} A message carries $P\cdot b$ bytes ($b=4$ for 32-bit, 2 for 16-bit updates), with one
 download per selected client and one upload per returning client; framing headers are excluded. With $v_r$ the
@@ -275,7 +275,7 @@ finite shards) and client mean loads were equal, yet the gap remained \RvWinKfiv
 \RvWinKfiftyGap{} and \RvWinKhundredGap{}\,\% at $K=5$, 20, 50 and 100, that is \RvWinShareLo{}--\RvWinShareHi{}\,\% of
 the gap with homes at $K\ge20$ and \RvWinKfiveShare{}\,\% at $K=5$ (shares from unrounded gaps). At run level the
 windows were better than homes by $\Delta=\RvTsWinHomeKtwentyDiff{}$ at $K=20$ and \RvTsWinHomeKhundredDiff{} at
-$K=100$, neither significant ($p_{\mathrm{Holm}}$\,\RvTsWinHomeKtwentyP{} and \RvTsWinHomeKhundredP{}).
+$K=100$, neither significant ($p_{\mathrm{Holm}}$\,\RvTsWinHomeKtwentyP{} at $K=20$ and $p_{\mathrm{Holm}}$\,\RvTsWinHomeKhundredP{} at $K=100$).
 
 A regression of run-level test MAE on $\ln K$, $H_{\mathrm{JS}}$ and an indicator for groupings of homes, over all FedAvg
 runs with random, Dirichlet, cluster, shape and window partitions ($n=\RvRegTwoN{}$), gave $\RvRegTwolnK{}\times10^{-3}$\,kWh
@@ -311,7 +311,7 @@ All runs but one stopped after 50 rounds without improvement; one $K=100$ run wi
 centralised training of the same seed, but with three seeds per arm the plateau differences between homes and windows ($\Delta=\RvTsPlWinHomeKtwentyDiff{}$ to
 \RvTsPlWinHomeKhundredDiff{}) were not significant after correction. Reaching the plateau was expensive: a $K=100$ run
 moved \RvPlhomesKhundredMBbest{}\,MB up to its best round and \RvPlhomesKhundredMBtotal{}\,MB in all, against
-\EonethreefedavghouseholdMB{}\,MB for 30 rounds; the 100-round runs of the first revision moved \RvLongKtwentyMB{},
+\EonethreefedavghouseholdMB{}\,MB for 30 rounds; the runs of up to 100 rounds in Supplementary Table S2 moved \RvLongKtwentyMB{},
 \RvLongKfiftyMB{} and \RvLongKhundredMB{}\,MB at $K=20$, 50 and 100.
 
 \begin{figure}
@@ -431,10 +431,10 @@ of Table~\ref{tab:frag}; second and third cohorts: two seeds.}\label{tab:cohorts
 The growth of the gap with $K$ and the share kept by the control were repeated in the two further cohorts
 (Table~\ref{tab:cohorts}). With 20 or more clients the control kept \RvCoShareBigLo{}--\RvCoShareBigHi{}\,\% of the gap
 with homes in every cohort. At $K=5$ the gaps were small (at most \RvCoHomeKfiveHi{}\,\%) and changed sign between cohorts, so a share is
-not meaningful there. The size of the gap varied: at $K=100$ it ranged from \RvCohortGapKonezerozeroLo{} to
-\RvCohortGapKonezerozeroHi{}\,\% across cohorts and at $K=20$ from \RvCohortGapKtwozeroLo{} to
-\RvCohortGapKtwozeroHi{}\,\%. The ranking of centralised and local training was not stable either: local-only training
-was between \RvCohortLocalGapLo{} and \RvCohortLocalGapHi{}\,\% from centralised, and in one cohort it was the better of
+not meaningful there. The size of the gap varied: at $K=100$ it ranged from \RvCoHomeKhundredLo{} to
+\RvCoHomeKhundredHi{}\,\% across cohorts and at $K=20$ from \RvCoHomeKtwentyLo{} to
+\RvCoHomeKtwentyHi{}\,\%. The ranking of centralised and local training was not stable either: local-only training
+was between \RvCoLocalGapLo{} and \RvCoLocalGapHi{}\,\% from centralised, and in one cohort it was the better of
 the two.
 
 
@@ -454,11 +454,11 @@ One message was \PayloadKB{}\,kB, so 30 rounds with $K=20$ moved \Ethreefedavgii
 bytes per row). Thirty rounds at $K\ge20$ with 32-bit updates and full participation thus moved more bytes than the
 readings in any of these encodings. Settings with less traffic, $K=5$ (\EonefourfedavgKfiveMB{}\,MB), 16-bit updates
 (\EonetwofedavgfponesixmoderateMB{}\,MB) and half participation with stragglers (\EeightfedavgpartialMB{}\,MB), moved
-more than the binary encodings but less than the comma-separated file: partial participation lowered total traffic to
-\EeightfedavgpartialMB{}\,MB and 16-bit updates halved it. Neither of the two lost accuracy: the changes in pooled MAE were
-\RvPrecfponesixRel{} and \RvPrecpartialRel{}\,\% ($\Delta=\RvTsFponesixDiff{}$ and \RvTsPartialDiff{},
-$p_{\mathrm{Holm}}$\,\RvTsFponesixP{} and \RvTsPartialP{}), and \RvTsFponesixHH{} and \RvTsPartialHH{}\,\% of households
-did better. Both plausibly act as mild regularisers. Training to a plateau multiplies traffic by the number of rounds
+more than the binary encodings but less than the comma-separated file: 16-bit updates halved the traffic and half participation with stragglers
+lowered it further. Neither lost accuracy: against full participation with 32-bit updates, the pooled MAE changed by
+\RvPrecfponesixRel{}\,\% with 16-bit updates ($\Delta=\RvTsFponesixDiff{}$, $p_{\mathrm{Holm}}$\,\RvTsFponesixP{}; \RvTsFponesixHH{}\,\% of households
+did better) and by \RvPrecpartialRel{}\,\% with half participation ($\Delta=\RvTsPartialDiff{}$, $p_{\mathrm{Holm}}$\,\RvTsPartialP{};
+\RvTsPartialHH{}\,\% of households did better). Both plausibly act as mild regularisers. Training to a plateau multiplies traffic by the number of rounds
 (see the plateau runs above), so at these settings the bandwidth comparison with the raw readings only becomes less favourable to
 federation with longer training.
 
@@ -494,7 +494,7 @@ averages, and the average of many short local trajectories progresses less per r
 data~\cite{stich2019localsgd,woodworth2020localsgd,woodworth2020minibatch}. Training to a plateau recovered a large part
 of this cost, at a traffic of gigabytes per run, but not all of it, and the part that remained with identical clients
 was of the same order as the part attributable to heterogeneity. Heterogeneity mainly slowed early convergence, through
-disagreeing client updates, which is why drift remedies helped little here, whereas a server-side adaptive optimiser,
+disagreeing client updates, which may explain why drift remedies helped little here, whereas a server-side adaptive optimiser,
 which acts on the budget, narrowed the meter-level gap. The heterogeneity
 reachable with these homes was limited ($H_{\mathrm{JS}}$ at most \RvHJSHomeKhundred{}), and populations with
 photovoltaics, electric vehicles, heat pumps or time-of-use tariffs, or clients of unequal size, may differ much more,
