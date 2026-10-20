@@ -9,6 +9,7 @@ School of Computer Science and Engineering, Vellore Institute of Technology, Vel
 ORCID: 0009-0004-7032-6847 (P. Gupta), 0009-0003-0735-264X (V. Kaushik), 0000-0003-4027-3137 (Kalaavathi B)
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23493458.svg)](https://doi.org/10.5281/zenodo.23493458)
+
 Archived release: v1.0.0 on Zenodo, https://doi.org/10.5281/zenodo.23493458 (all versions).
 
 | | |
