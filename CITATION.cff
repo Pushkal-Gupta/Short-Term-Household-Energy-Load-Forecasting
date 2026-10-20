@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you use this code or its results, please cite the manuscript and this repository."
+title: "Training budget and fragmentation, more than heterogeneity, drive the accuracy cost of federated household load forecasting: code and results"
+type: software
+authors:
+  - family-names: Gupta
+    given-names: Pushkal
+    affiliation: "School of Computer Science and Engineering, Vellore Institute of Technology, Vellore, India"
+    orcid: "https://orcid.org/0009-0004-7032-6847"
+  - family-names: Kaushik
+    given-names: Vanka
+    affiliation: "School of Computer Science and Engineering, Vellore Institute of Technology, Vellore, India"
+    orcid: "https://orcid.org/0009-0003-0735-264X"
+  - family-names: B
+    given-names: Kalaavathi
+    affiliation: "School of Computer Science and Engineering, Vellore Institute of Technology, Vellore, India"
+    email: kalaavathi.b@vit.ac.in
+    orcid: "https://orcid.org/0000-0003-4027-3137"
+repository-code: "https://github.com/Pushkal-Gupta/Short-Term-Household-Energy-Load-Forecasting"
+keywords:
+  - federated learning
+  - load forecasting
+  - smart meters
+  - non-IID data
+  - communication efficiency
+  - Low Carbon London

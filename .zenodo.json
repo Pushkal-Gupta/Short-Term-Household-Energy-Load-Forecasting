@@ -1,0 +1,11 @@
+{
+  "title": "Training budget and fragmentation, more than heterogeneity, drive the accuracy cost of federated household load forecasting: code and results",
+  "upload_type": "software",
+  "description": "Code, configurations, per-run results and manuscript-generation scripts for a controlled study of federated LSTM household load forecasting on 100 Low Carbon London homes: fragmentation, training budget and heterogeneity are separated with an IID control, and every byte of federated traffic is counted. The LCL data are not redistributed.",
+  "creators": [
+    {"name": "Gupta, Pushkal", "affiliation": "Vellore Institute of Technology", "orcid": "0009-0004-7032-6847"},
+    {"name": "Kaushik, Vanka", "affiliation": "Vellore Institute of Technology", "orcid": "0009-0003-0735-264X"},
+    {"name": "B, Kalaavathi", "affiliation": "Vellore Institute of Technology", "orcid": "0000-0003-4027-3137"}
+  ],
+  "keywords": ["federated learning", "load forecasting", "smart meters", "non-IID data", "communication efficiency", "Low Carbon London"]
+}

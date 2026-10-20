@@ -24,7 +24,7 @@ count every byte exchanged. The main findings, all for one-step forecasts, are:
 \item The gap to centralised training grows with the number of clients the same homes are split over, from 1.8\,\% with
 five clients to 10.0\,\% with one client per home after 30 rounds. A control that deals training windows rather than
 homes, so that clients do not differ at all, keeps 71--96\,\% of the gap with 20 or more clients in three cohorts.
-\item Much of this cost is training budget: run to a plateau, at up to 4.7\,GB of traffic per run, the gap shrinks to
+\item Much of this cost is training budget: run to a plateau, at about 4.7\,GB of traffic per run on average (6.9\,GB for a run stopped at the 500-round cap), the gap shrinks to
 1.8--5.4\,\% for homes and 1.3--3.5\,\% for identical clients, so a fragmentation cost remains without any
 heterogeneity. A server-side adaptive optimiser recovers part of the budget cost; client-side optimiser changes do not.
 \item With 20 or more clients, federated training of a small LSTM moves more bytes than the raw half-hourly readings in

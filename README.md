@@ -1,22 +1,21 @@
-# What does heterogeneity cost? Federated LSTM load forecasting on London smart meters
+# Training budget and fragmentation, more than heterogeneity, drive the accuracy cost of federated household load forecasting
 
 Code, experiments and manuscript for a controlled, communication-priced study of federated
 short-term load forecasting on the Low Carbon London (LCL) smart-meter data.
 
-**Pushkal Gupta**\* · **Vanka Kaushik** · **Kalaavathi B**  
-School of Computer Science and Engineering, Vellore Institute of Technology, Vellore, India  
-\*Corresponding author: pushkal.gupta2023@vitstudent.ac.in
+**Pushkal Gupta** · **Vanka Kaushik** · **Kalaavathi B**\*  
+School of Computer Science and Engineering, Vellore Institute of Technology, Vellore 632014, Tamil Nadu, India  
+\*Corresponding author: Kalaavathi B, kalaavathi.b@vit.ac.in  
+ORCID: 0009-0004-7032-6847 (P. Gupta), 0009-0003-0735-264X (V. Kaushik), 0000-0003-4027-3137 (Kalaavathi B)
 
 | | |
 |---|---|
-| **Data** | Low Carbon London (UK Power Networks), half-hourly kWh, 2013, 100 standard-tariff homes |
+| **Data** | Low Carbon London (UK Power Networks), half-hourly kWh, 2013; main cohort of 100 standard-tariff homes and two further cohorts |
 | **Task** | one home's last 24 h (48 half-hours) → its next half-hour |
 | **Model** | one LSTM (64 hidden units, 17,217 parameters) shared by every arm |
-| **Arms** | persistence · seasonal naive · local-only · centralised · FedAvg · FedProx · HA-FedProx · FedAvg + local fine-tuning |
+| **Arms** | persistence · seasonal naive · local-only · client-only · centralised · FedAvg (homes or IID window control) · FedProx · HA-FedProx · FedAdam · FedAvg + local fine-tuning |
 | **Stack** | PyTorch; deterministic in-process FL simulator; optional Flower backend that reproduces it exactly |
-| **Manuscript** | [`paper/manuscript.tex`](paper/manuscript.tex) → `paper/manuscript.pdf` (Elsevier `elsarticle`); revised Word version in the IMRaD journal template: [`paper/docx/manuscript.docx`](paper/docx/manuscript.docx) (12 pages) with `supplementary.docx`, and a point-by-point [`submission/response_to_review.docx`](submission/response_to_review.docx); `manuscript_long.docx` and the LaTeX version predate the revision |
-
-![Graphical abstract](results/plots/graphical_abstract.png)
+| **Manuscript** | [`submission/main.pdf`](submission/main.pdf) / [`submission/main.docx`](submission/main.docx) (built from [`paper/docx/content.tex`](paper/docx/content.tex)), supplement [`submission/supplementary_material.pdf`](submission/supplementary_material.pdf); `paper/manuscript.tex` (LaTeX) and `manuscript_long.docx` predate the revisions |
 
 ---
 
@@ -25,14 +24,16 @@ School of Computer Science and Engineering, Vellore Institute of Technology, Vel
 Federated learning (FL) lets homes train a shared forecaster without sending their readings
 anywhere. Two claims are usually made for it: that household data are so heterogeneous that plain
 FedAvg needs a fix, and that FL saves bandwidth. This repository tests both claims under one
-controlled protocol. The households, the split, the model and the compute budget stay fixed, and
-exactly one factor changes at a time:
+controlled protocol. The households, the split, the test set and the model stay fixed, and
+one factor changes at a time:
 
 | Factor | Settings |
 |---|---|
-| Pooling | local-only · centralised · federated |
+| Pooling | local-only · client-only · centralised · federated |
 | Fragmentation | the same 100 homes split into K = 1, 5, 20, 50 or 100 clients |
-| Heterogeneity | random grouping → Dirichlet α ∈ {1, 0.3, 0.1} over load-profile clusters → fully clustered |
+| Heterogeneity | IID control (training windows dealt at random) → random grouping of homes → Dirichlet α ∈ {1, 0.3, 0.1} over load-profile clusters → cluster or shape-sorted grouping |
+| Training budget | 30 rounds · up to 100 rounds · to a plateau (up to 500 rounds, stopped after 50 without improvement) |
+| Optimiser | client Adam reset each round (default) or kept · client SGD · server FedAdam |
 | Participation | all clients, or 50 % per round with 20 % stragglers |
 | Aggregation | FedAvg · FedProx · HA-FedProx |
 | Update precision | float32 or float16 |
@@ -42,102 +43,60 @@ factor that changed.
 
 ## 2. Contributions
 
-1. **Gap decomposition.** The federated-vs-centralised gap is split into four costs: the round
-   protocol (one client holding all the data), fragmentation (the same homes over K clients),
-   heterogeneity, and participation.
-2. **Measured heterogeneity.** A label-free index H between clients: the Jensen–Shannon divergence
-   of hour-of-week load shapes plus the dispersion of mean load, computed on training data only.
-   Results are plotted against measured H, not against nominal α.
-3. **Communication-priced accuracy.** An exact byte ledger (upload + download) and two metrics:
-   **R@ε** and **B@ε**, the rounds and megabytes needed to come within ε = 10 % of centralised
-   validation MAE. Both are compared with the raw-data volume that pooling would move.
-4. **Equity.** For each household, the federation benefit over training alone, the share of homes
-   that federation makes worse off, errors by consumption quintile, and paired Wilcoxon tests with
-   Holm correction.
-5. **HA-FedProx and a negative result.** HA-FedProx schedules FedProx's μ every round from a bounded
-   update-space estimate of FedProx's B-dissimilarity: ρ_t = Σp‖Δk−Δ̄‖² / Σp‖Δk‖². It costs nothing
-   extra to compute. We show why this signal follows training progress rather than heterogeneity
-   on household load data.
+1. **Gap decomposition with an IID control.** Splitting the same homes over more clients is
+   compared with dealing their training windows at random to the same number of clients, so that
+   clients do not differ. This separates fragmentation and training budget from heterogeneity.
+2. **Byte ledger.** Exact upload and download traffic per round, B@ε and R@ε (bytes and rounds until
+   validation MAE stays within ε of centralised), compared with four encodings of the raw readings.
+3. **Who loses from federation.** Per-household harm with a 1 % margin, a client-only baseline and
+   local fine-tuning.
+4. **Negative results.** Calendar inputs, proximal regularisation (validation-tuned μ = 0) and client
+   optimiser changes do not help; a server-side adaptive optimiser helps partly.
 
-Positioning against prior work is documented in [`paper/LITERATURE_NOTES.md`](paper/LITERATURE_NOTES.md).
-In particular, Briggs et al. (2022) already observed plain FL losing to local models on LCL; this
-study quantifies where the loss comes from and what it costs in bytes.
+Statistics use the training run as the unit (paired t-tests by seed, Welch otherwise) with one Holm
+correction over all 31 comparisons. Positioning against prior work is in
+[`paper/LITERATURE_NOTES.md`](paper/LITERATURE_NOTES.md).
 
 ## 3. Results
 
 <!-- RESULTS -->
-All numbers below are real-data results on 100 LCL households: means over 3 seeds, computed on the
-same 292,052 test half-hours. They are generated by `make_report` (`results/metrics/`).
+All numbers are real-data results on the main cohort of 100 LCL households, means over seeds (five
+for the main arms, three for the plateau and optimiser runs), on the same 292,052 test half-hours.
+They are produced by `make report` and `make docx` (`results/metrics/`, `paper/generated/`); the
+manuscript gives confidence intervals and corrected p-values for each.
 
-### Main comparison
-
-| Method | MAE (kWh) | RMSE (kWh) | MAPE* (%) | WAPE (%) | Best round / rounds | Communication (MB) | Raw data leaves home | Seeds |
-|---|---|---|---|---|---|---|---|---|
-| Persistence (naive) | 0.0890 | 0.1987 | 41.06 | 37.64 | n/a | 0.0 | n/a | 1 |
-| Seasonal naive (t−48) | 0.1332 | 0.2773 | 63.62 | 56.33 | n/a | 0.0 | n/a | 1 |
-| Local-only LSTM | 0.0840 ± 0.0003 | 0.1779 ± 0.0006 | 37.27 ± 0.40 | 35.52 | n/a | 0.0 | No | 3 |
-| Centralised LSTM (pooled raw data) | 0.0811 ± 0.0003 | 0.1718 ± 0.0015 | 36.66 ± 0.81 | 34.30 | n/a | 14.0 | Yes | 3 |
-| FedAvg, random (IID-ish) | 0.0853 ± 0.0009 | 0.1758 ± 0.0007 | 38.97 ± 0.61 | 36.07 | 23.0 / 30 | 82.6 | No | 3 |
-| FedAvg, α=0.3 | 0.0861 ± 0.0004 | 0.1758 ± 0.0007 | 39.72 ± 0.15 | 36.42 | 24.0 / 30 | 82.6 | No | 3 |
-| FedProx, α=0.3 | 0.0858 ± 0.0001 | 0.1755 ± 0.0006 | 39.50 ± 0.11 | 36.31 | 26.0 / 30 | 82.6 | No | 3 |
-| HA-FedProx, α=0.3 | 0.0863 ± 0.0003 | 0.1765 ± 0.0005 | 39.62 ± 0.11 | 36.52 | 20.7 / 30 | 82.6 | No | 3 |
-| FedAvg, cluster (strong) | 0.0857 ± 0.0003 | 0.1758 ± 0.0005 | 39.19 ± 0.17 | 36.24 | 22.0 / 30 | 82.6 | No | 3 |
-| FedProx, cluster (strong) | 0.0858 ± 0.0002 | 0.1759 ± 0.0006 | 39.33 ± 0.16 | 36.29 | 23.3 / 30 | 82.6 | No | 3 |
-| HA-FedProx, cluster (strong) | 0.0865 ± 0.0002 | 0.1772 ± 0.0008 | 39.54 ± 0.45 | 36.58 | 15.7 / 30 | 82.6 | No | 3 |
-| FedAvg, α=0.3, 50% participation + 20% stragglers | 0.0849 ± 0.0004 | 0.1757 ± 0.0010 | 38.74 ± 0.50 | 35.92 | 24.0 / 30 | 37.4 | No | 3 |
-| FedProx, α=0.3, 50% participation + 20% stragglers | 0.0857 ± 0.0003 | 0.1764 ± 0.0012 | 39.10 ± 0.25 | 36.24 | 20.7 / 30 | 41.3 | No | 3 |
-| HA-FedProx, α=0.3, 50% participation + 20% stragglers | 0.0857 ± 0.0003 | 0.1769 ± 0.0011 | 39.14 ± 0.18 | 36.25 | 23.0 / 30 | 41.3 | No | 3 |
-| FedAvg, α=0.3, float16 updates | 0.0858 ± 0.0005 | 0.1756 ± 0.0009 | 39.47 ± 0.27 | 36.28 | 25.3 / 30 | 41.3 | No | 3 |
-| FedAvg, 1 household = 1 client | 0.0894 ± 0.0013 | 0.1816 ± 0.0009 | 40.90 ± 1.52 | 37.83 | 29.0 / 30 | 413.2 | No | 3 |
-| FedProx, 1 household = 1 client | 0.0893 ± 0.0013 | 0.1817 ± 0.0011 | 40.68 ± 1.58 | 37.77 | 30.0 / 30 | 413.2 | No | 3 |
-| HA-FedProx, 1 household = 1 client | 0.0901 ± 0.0005 | 0.1823 ± 0.0009 | 41.23 ± 0.80 | 38.11 | 29.3 / 30 | 413.2 | No | 3 |
-| FedAvg, K=1 client(s), random | 0.0808 ± 0.0005 | 0.1710 ± 0.0003 | 36.70 ± 0.34 | 34.19 | 16.3 / 30 | 4.1 | No | 3 |
-| FedAvg, K=5 client(s), random | 0.0827 ± 0.0005 | 0.1721 ± 0.0006 | 38.07 ± 0.22 | 34.97 | 23.0 / 30 | 20.7 | No | 3 |
-| FedAvg, K=50 client(s), random | 0.0869 ± 0.0006 | 0.1782 ± 0.0005 | 39.57 ± 0.47 | 36.75 | 26.7 / 30 | 206.6 | No | 3 |
-
-*MAPE over half-hours with actual load ≥ the configured threshold (0.05 kWh by default). Mean ± std over seeds. Centralised 'communication' is the raw training data volume (value + timestamp).
+| Arm | K | Test MAE (kWh) | Gap to centralised | Traffic, 30 rounds (MB) |
+|---|---|---|---|---|
+| Persistence | – | 0.0890 | – | 0 |
+| Local-only | – | 0.0839 | +3.3 % | 0 |
+| Centralised | – | 0.0812 | 0.0 % | 14.0 (raw data, 12 B/reading) |
+| FedAvg, one client | 1 | 0.0809 | −0.4 % | 4.1 |
+| FedAvg, homes at random | 5 | 0.0826 | +1.8 % | 20.7 |
+| FedAvg, homes at random | 20 | 0.0854 | +5.2 % | 82.6 |
+| FedAvg, homes at random | 50 | 0.0870 | +7.2 % | 206.6 |
+| FedAvg, one home per client | 100 | 0.0893 | +10.0 % | 413.2 |
 
 ### Key findings
 
-1. **The round protocol costs nothing.** FedAvg with one client holding all homes (K = 1) reaches
-   0.0808 kWh against 0.0811 kWh for centralised training. The per-household difference
-   is not significant (Holm p = 0.31).
-2. **The federated gap is a fragmentation cost.** Splitting the same homes over more clients
-   raises error steadily:
+1. **Fragmentation costs accuracy even without heterogeneity.** With training windows dealt at
+   random (identical clients), the 30-round gap was 1.1, 4.4, 5.4 and 7.6 % at K = 5, 20, 50 and
+   100: 76–85 % of the gap with homes at K ≥ 20, and 71–96 % across three cohorts.
+2. **Much of the gap is training budget.** Trained to a plateau, the gap fell to 1.8, 4.4 and 5.4 %
+   with homes and 1.3, 1.9 and 3.5 % with windows at K = 20, 50 and 100. A K = 100 run with homes
+   moved about 4,711 MB on average (6,887 MB for the run stopped at the 500-round cap).
+3. **Optimisers.** Keeping client Adam state changed nothing; client SGD was worse (significantly at
+   K = 20). Server FedAdam narrowed the one-home-per-client gap from 7.3 to 5.3 % over 100 rounds,
+   in 3 of 3 seeds but not significantly.
+4. **Heterogeneity mainly slows early training.** At K = 20, groupings of homes from random to
+   shape-sorted left final error within 0.0851–0.0860 kWh; heterogeneity showed up as a larger rise
+   of validation error in the first rounds and more disagreement between client updates.
+5. **FL is not the bandwidth-light option at this scale.** The training readings occupy 2.3–58.1 MB
+   depending on encoding; 30 rounds at K ≥ 20 moved more than any of them.
+6. **Equity.** FedAvg at K = 20 harmed (by more than 1 %) 51–56 % of households and 73 % at K = 100;
+   one epoch of local fine-tuning reduced this to 40 and 46 %. With one home per client, fine-tuned
+   FedAvg (0.0849 kWh) still lost to local models (0.0839 kWh).
 
-| K (clients) | Homes per client | H_JS | Test MAE (kWh) | + local FT | Gap to centralised |
-|---|---|---|---|---|---|
-| 1 | 100 | 0.0000 | 0.0808 ± 0.0005 | 0.0812 | -0.3 % |
-| 5 | 20 | 0.0028 | 0.0827 ± 0.0005 | 0.0818 | +2.0 % |
-| 20 | 5 | 0.0105 | 0.0853 ± 0.0009 | 0.0834 | +5.2 % |
-| 50 | 2 | 0.0261 | 0.0869 ± 0.0006 | 0.0842 | +7.2 % |
-| 100 | 1 | 0.0497 | 0.0894 ± 0.0013 | 0.0851 | +10.3 % |
-
-   Regressing error on log K and the measured heterogeneity H_JS across 24 runs gives a
-   significant effect of log K (p = 0.007). The heterogeneity term is not significant
-   (p = 0.055).
-3. **Heterogeneity costs bandwidth, not accuracy.** At K = 20, grouping homes from random to fully
-   profile-clustered moves final MAE by at most 0.0012 kWh. It does raise the traffic needed to come
-   within 10 % of centralised validation error (B@ε): 12.9 MB (random) →
-   21.1 MB (α = 0.3) → 23.9 MB (clustered).
-4. **FL is not the bandwidth-light option at this scale.** Uploading the raw training readings would
-   move 14.0 MB. Thirty rounds move
-   82.6 MB at K = 20 and
-   413.2 MB with one client per home. Float16 updates
-   halve the traffic at no accuracy cost (0.0858 vs 0.0861 kWh).
-5. **Equity.** FedAvg (α = 0.3) is worse than a home's own local model for
-   66 % of households, and for
-   82 % with household clients. One epoch of local
-   fine-tuning, which needs no communication, brings this down to
-   48 %. Fine-tuned FedAvg is then tied with local
-   models per household (Holm p = 0.50). The highest-consumption quintile gains most from
-   pooled data, and is served worst by FedAvg.
-6. **Proximal regularisation does not help.** Validation tuning picks the smallest μ
-   (FedProx μ = 0.001, HA-FedProx μ₀ = 0.01). HA-FedProx is never better than
-   FedAvg. Its signal ρ_t does rank heterogeneity (Spearman with H_JS ≈ +0.8). Its rise within a run,
-   however, is about 40× its spread across partitions, so μ_t ∝ ρ_t acts as a convergence ramp.
-
-Figures: `results/plots/` (also `paper/figures/`). The manuscript is in [`paper/manuscript.pdf`](paper/manuscript.pdf).
+Figures: `paper/figures/` and `results/plots/`.
 <!-- /RESULTS -->
 
 ## 4. Pipeline
@@ -147,7 +106,7 @@ LCL zip ─► preprocess ─► per-home scaler (train only) ─► 48→1 wind
                                                                          └─► partition ─► K clients
                                                     weights only  ▲            │ (data stays here)
                                                                   │            ▼
-                                       server: sample → broadcast → local fit (+prox) → n_k-weighted mean
+                                       server: sample → broadcast → local fit (+prox) → n_k-weighted mean (or FedAdam step)
                                                → best round on validation → HA-FedProx μ update
                                                → byte ledger → metrics, statistics, plots, LaTeX tables
 ```
@@ -192,6 +151,15 @@ make paper                                        # paper/manuscript.pdf (tecton
 make docx                                         # revision analyses, Word manuscript, supplement, long version, review response
 ```
 
+The revision runs (IID control, budget and plateau runs, client-only, optimisers, further cohorts)
+use their own matrices and are analysed by `src/evaluation/revision.py` (run by `make docx`):
+
+```bash
+python -m src.experiments.run_matrix --matrix configs/matrix_revision.yaml --workers 8
+python -m src.experiments.run_matrix --matrix configs/matrix_revision2.yaml --workers 8
+python -m src.experiments.run_matrix --matrix configs/matrix_revision2_opt.yaml --workers 8
+```
+
 The full matrix takes about 8 h on one Apple M5 Max with 8 parallel runs. Finished runs are skipped
 on restart. Individual arms can be run on their own:
 
@@ -224,7 +192,7 @@ real households with 3 rounds as a quick check.
 | E13 | FedAvg, FedProx, HA-FedProx | one household per client (K = 100) |
 | E14 | FedAvg | random grouping, K ∈ {1, 5, 50} |
 
-Every row uses 3 seeds (42, 43, 44). FedProx μ and HA-FedProx μ₀ are tuned on validation data only
+Every row uses seeds 42, 43 and 44; the revision matrices add seeds 45 and 46 for the main arms. FedProx μ and HA-FedProx μ₀ are tuned on validation data only
 (`results/metrics/tuning.json`).
 
 ### Outputs
@@ -235,7 +203,8 @@ Every row uses 3 seeds (42, 43, 44). FedProx μ and HA-FedProx μ₀ are tuned o
 | `results/metrics/summary_by_experiment.csv` | every experiment, mean/std over seeds, R@ε, B@ε |
 | `results/metrics/gap_decomposition.csv`, `fragmentation.csv` | where the federated gap comes from |
 | `results/metrics/heterogeneity.csv`, `rho_vs_heterogeneity.csv` | H, ρ and error per partition |
-| `results/metrics/stats_tests.csv` | paired Wilcoxon + Holm over households |
+| `results/metrics/stats_tests.csv` | per-household Wilcoxon tests (descriptive) |
+| `results/metrics/revision/` | run-level tests with one Holm correction, plateau, optimiser, cohort and budget tables |
 | `results/metrics/equity.csv`, `equity_by_stratum.csv` | who gains or loses from federation |
 | `results/metrics/runs/` | every run: summary JSON, per-round history, per-household errors |
 | `results/plots/*.png` | all figures (copied to `paper/figures/`) |
@@ -256,7 +225,7 @@ inverse scaling.
 ## 9. Repository layout
 
 ```
-configs/      default.yaml (real data) · demo.yaml (synthetic) · matrix.yaml (experiments)
+configs/      default.yaml (real data) · demo.yaml (synthetic) · matrix.yaml · matrix_revision*.yaml (experiments)
 data/         raw/ (LCL zip, not in git) · processed/ · clients/ · README.md
 src/
   config.py utils.py
@@ -267,11 +236,14 @@ src/
   federated/    client · server · fedavg · fedprox (HA-FedProx) · comm · flower_backend
   evaluation/   metrics · evaluate · plots · report
   experiments/  run_baselines · run_fedavg · run_fedprox · run_matrix · run_demo · make_report · common
+  evaluation/revision.py  run-level tests, IID control, plateau, optimiser, cohort and harm analyses
 results/      metrics/ · plots/ · logs/ · demo/ (synthetic only)
 paper/        manuscript.tex · sections/ · refs.bib · generated/ · figures/ · LITERATURE_NOTES.md
-  docx/       template.docx · content.tex (12 pages) · content_supp.tex · content_long.tex · build_docx.py · response.py (first review, frozen) · response2.py · workflow_figure.py
+  docx/       template.docx · content.tex (15 pages) · content_supp.tex · content_long.tex · build_docx.py · response.py (first review, frozen) · response2.py · workflow_figure.py
 docs/         TECHNICAL.md
 tests/        test_core.py
+submission/   main.docx/.pdf (manuscript) · supplementary_material · response_to_review_2 · cover_letter · highlights
+CITATION.cff, .zenodo.json   citation metadata for the repository
 ```
 
 ## 10. Limitations
@@ -286,10 +258,10 @@ tests/        test_core.py
   household's validation and test windows. In deployment this would be client-side `evaluate` calls.
 - **Determinism.** Runs are bit-exact on CPU. On MPS and CUDA they may differ in the last digits.
 - **Fixed hyper-parameters.** Learning rate, hidden size and window are fixed a priori for every arm.
-  Only μ and μ₀ are tuned, on validation data.
+  Only μ, μ₀ and the SGD and FedAdam step sizes are tuned, on validation data.
 
 ## 11. Data and licence
 
 The LCL data are published by UK Power Networks on the London Datastore under their own licence
 and are not included here. The code is released for research use. Please cite the manuscript if
-you use it.
+you use it; citation metadata for this repository are in [`CITATION.cff`](CITATION.cff).

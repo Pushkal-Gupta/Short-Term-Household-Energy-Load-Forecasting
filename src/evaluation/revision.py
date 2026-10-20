@@ -330,6 +330,10 @@ def regression(R, out):
             _m(k + "hi", (b_ + t2 * s_) * 1e3, "{:.1f}" if term != "lnK" else "{:.2f}")
             M["Rv" + k + "P"] = _p(p_)
         _m(_key(f"Reg{'Two' if label.startswith('lnK') else 'Kt'}N"), n2, "{:d}")
+        if label.startswith("lnK"):                     # effect sizes over the tested ranges, from this model
+            _m("RegTwoEffK", b2[1] * np.log(100 / 5), "{:.4f}")
+            if len(g20):
+                _m("RegTwoEffH", b2[2] * (g20.max() - g20.min()), "{:.4f}")
     pd.DataFrame(rows2).to_csv(out / "regression_extra.csv", index=False)
     # correlation between ln K and H_JS among the home groupings (why the pooled fit finds both terms)
     hd = d[d["homes"] == 1]
@@ -439,7 +443,7 @@ def heterogeneity(R, rundir, out, gen, figs, central_vals):
     axs[1].set_xlabel("ε (% above centralised validation MAE)")
     axs[1].set_ylabel("B@ε (MB; dots: seeds, line: mean)")
     axs[1].set_ylim(0, top_mb * 1.06)
-    axs[1].text(0.98, 0.84, "× not reached within 30 rounds", transform=axs[1].transAxes, ha="right", fontsize=7)
+    axs[1].text(0.98, 0.84, "× never settled within 30 rounds", transform=axs[1].transAxes, ha="right", fontsize=7)
     axs[1].set_xticks(EPS)
     axs[1].grid(alpha=0.25)
     axs[1].text(-0.13, 1.04, "(b)", transform=axs[1].transAxes, va="bottom", fontweight="bold")
@@ -918,6 +922,10 @@ def plateau(R, rundir, out, gen, figs, central_test, central_val):
             _m(f"{k}MBbest", r["mb_best"], "{:,.0f}")
             _m(f"{k}MBtotal", r["mb_total"], "{:,.0f}")
             _m(f"{k}Cap", r["hit_cap"], "{:d}")
+            cap = s[s["rounds_run"] >= s["rounds"]]                 # runs stopped by the round cap, not the plateau
+            if len(cap):
+                _m(f"{k}CapMB", cap["total_bytes"].max() / 1e6, "{:,.0f}")
+                _m(f"{k}CapBestMB", cap["bytes_to_best_round"].max() / 1e6, "{:,.0f}")
             tab.append([K, arm, r["n"], r["best"], r["run"], f"{r['mae']:.4f} $\\pm$ {r['sd']:.4f}", _signed(r["gap"]),
                         f"{r['mb_best']:,.0f}", f"{r['mb_total']:,.0f}"])
     df = pd.DataFrame(rows)

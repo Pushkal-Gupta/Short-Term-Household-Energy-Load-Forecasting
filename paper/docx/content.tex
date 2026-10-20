@@ -17,7 +17,7 @@ fixed one-step long short-term memory forecaster. The homes were split over 1 to
 dealt training windows, not homes, to clients so that clients did not differ. After 30 rounds, the gap to centralised
 training grew from \RvHomeKfiveGap{}\,\% at five clients to \RvHomeKhundredGap{}\,\% with one home per client, and with 20
 or more clients the control kept \RvCoShareBigLo{}--\RvCoShareBigHi{}\,\% of the gap in three cohorts. Training to a
-plateau, at up to \RvPlhomesKhundredMBtotal{}\,MB per run, shrank the gap to \RvPlHomeGapLo{}--\RvPlHomeGapHi{}\,\% for
+plateau, at about \RvPlhomesKhundredMBtotal{}\,MB per run on average (\RvPlhomesKhundredCapMB{}\,MB for the run stopped at the round cap), shrank the gap to \RvPlHomeGapLo{}--\RvPlHomeGapHi{}\,\% for
 homes and \RvPlWinGapLo{}--\RvPlWinGapHi{}\,\% for the control: much of the cost was training budget, and part remained
 without heterogeneity. Over 100 rounds, server-side Adam narrowed the one-home-per-client gap from
 \RvOptAdamKonezerozeroGap{} to \RvOptFedAdamKonezerozeroGap{}\,\%; kept client optimiser state and client SGD did not
@@ -285,8 +285,9 @@ and $\RvRegTwohomes{}\times10^{-3}$\,kWh for homes rather than windows (CI \RvRe
 $p$\,\RvRegTwohomesP{}; uncorrected). Among groupings of homes $\ln K$ and $H_{\mathrm{JS}}$ were correlated
 ($r=\RvRegCorrKH{}$), so the pooled fit cannot fully separate them; within $K=20$ alone, the $H_{\mathrm{JS}}$ term was
 $\RvRegKtHJS{}\times10^{-3}$\,kWh (CI \RvRegKtHJSlo{} to \RvRegKtHJShi{}, $n=\RvRegKtN{}$). Over the ranges tested,
-going from five to 100 clients corresponds to \RvRegEffK{}\,kWh, whereas the whole range of $H_{\mathrm{JS}}$ obtained
-at $K=20$ (\RvRegHJSRangeLo{} to \RvRegHJSRangeHi{}) corresponds to \RvRegEffH{}\,kWh.
+the three-term model gives \RvRegTwoEffK{}\,kWh for going from five to 100 clients ($\RvRegTwolnK{}\times10^{-3}\times\ln 20$),
+whereas the whole range of $H_{\mathrm{JS}}$ obtained at $K=20$ (\RvRegHJSRangeLo{} to \RvRegHJSRangeHi{}) corresponds to
+\RvRegTwoEffH{}\,kWh.
 
 \begin{table}
 \caption{Fragmentation with and without heterogeneity (FedAvg). Homes: homes grouped at random; windows: training
@@ -309,8 +310,9 @@ not close: identical clients still kept \RvPlShareLo{}--\RvPlShareHi{}\,\% of th
 All runs but one stopped after 50 rounds without improvement; one $K=100$ run with homes was still improving at the
 500-round cap, so that gap is an upper bound. At $K=20$ and 100 every plateau run, with homes or windows, remained less accurate than
 centralised training of the same seed, but with three seeds per arm the plateau differences between homes and windows ($\Delta=\RvTsPlWinHomeKtwentyDiff{}$ to
-\RvTsPlWinHomeKhundredDiff{}) were not significant after correction. Reaching the plateau was expensive: a $K=100$ run
-moved \RvPlhomesKhundredMBbest{}\,MB up to its best round and \RvPlhomesKhundredMBtotal{}\,MB in all, against
+\RvTsPlWinHomeKhundredDiff{}) were not significant after correction. Reaching the plateau was expensive: on average a $K=100$ run
+with homes moved \RvPlhomesKhundredMBbest{}\,MB up to its best round and \RvPlhomesKhundredMBtotal{}\,MB in all, and the run stopped at
+the 500-round cap moved \RvPlhomesKhundredCapMB{}\,MB, against
 \EonethreefedavghouseholdMB{}\,MB for 30 rounds; the runs of up to 100 rounds in Supplementary Table S2 moved \RvLongKtwentyMB{},
 \RvLongKfiftyMB{} and \RvLongKhundredMB{}\,MB at $K=20$, 50 and 100.
 
@@ -502,7 +504,7 @@ so the relative weight of the costs should not be generalised beyond London hous
 
 In practice, the number of clients and the budget were the most consequential choices. Federating five aggregated
 clients cost \RvHomeKfiveGap{}\,\% in MAE after 30 rounds; meter-level federation cost \RvHomeKhundredGap{}\,\% after 30
-rounds and \RvPlhomesKhundredGap{}\,\% at the plateau, after up to \RvPlhomesKhundredMBtotal{}\,MB of traffic. Since one
+rounds and \RvPlhomesKhundredGap{}\,\% at the plateau, after about \RvPlhomesKhundredMBtotal{}\,MB of traffic per run on average (\RvPlhomesKhundredCapMB{}\,MB for the capped run). Since one
 household's eight months of training readings occupy about 47\,kB even at 4 bytes per value, less than one 68.9\,kB
 message, federation at this scale is a governance choice based on data minimisation and consent, not a bandwidth
 saving. Operators should federate few, aggregated clients held by a trusted hub such as a building gateway or energy

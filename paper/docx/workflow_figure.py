@@ -67,27 +67,28 @@ def main(path: Path = OUT) -> Path:
     ax.add_patch(FancyBboxPatch((0.530, 0.705), 0.215, 0.110, boxstyle="round,pad=0.004,rounding_size=0.01",
                                 fc=NAVY, ec=NAVY))
     ax.text(0.6375, 0.775, "Server", ha="center", va="center", fontsize=8, weight="bold", color="white")
-    ax.text(0.6375, 0.735, "FedAvg · FedProx", ha="center", va="center", fontsize=6.6,
+    ax.text(0.6375, 0.735, "FedAvg · FedProx · FedAdam", ha="center", va="center", fontsize=6.6,
             color="white")
     for i, x in enumerate([0.515, 0.600, 0.685]):
-        ax.add_patch(FancyBboxPatch((x, 0.440), 0.076, 0.095, boxstyle="round,pad=0.003,rounding_size=0.008",
+        ax.add_patch(FancyBboxPatch((x, 0.485), 0.076, 0.090, boxstyle="round,pad=0.003,rounding_size=0.008",
                                     fc="white", ec=BLUE, lw=0.8))
-        ax.text(x + 0.038, 0.505, f"client ${'k' if i == 1 else ('1' if i == 0 else 'K')}$", ha="center",
+        ax.text(x + 0.038, 0.548, f"client ${'k' if i == 1 else ('1' if i == 0 else 'K')}$", ha="center",
                 va="center", fontsize=6.6, color=INK)
-        ax.text(x + 0.038, 0.466, "LSTM", ha="center", va="center", fontsize=6.2, color=INK)
-        arrow(ax, (x + 0.024, 0.700), (x + 0.024, 0.540), color=BLUE)
-        arrow(ax, (x + 0.052, 0.540), (x + 0.052, 0.700), color="#c0504d")
+        ax.text(x + 0.038, 0.509, "LSTM", ha="center", va="center", fontsize=6.2, color=INK)
+        arrow(ax, (x + 0.024, 0.700), (x + 0.024, 0.580), color=BLUE)
+        arrow(ax, (x + 0.052, 0.580), (x + 0.052, 0.700), color="#c0504d")
     ax.text(0.620, 0.620, "", ha="center")
-    ax.text(0.507, 0.620, "$w_r$", fontsize=7, color=BLUE, ha="left")
-    ax.text(0.768, 0.620, "$w_k$", fontsize=7, color="#c0504d", ha="right")
-    ax.text(0.510, 0.415, "$R$ = 30 (or ≤ 100) rounds × 1 epoch\nbytes: $P\\cdot b$ per message,\n$b$ = 4 (fp32) or 2 (fp16)\n"
-            "participation $C$, stragglers $p_s$\nfresh Adam state per round", ha="left", va="top",
-            fontsize=6.8, color=INK, linespacing=1.35)
+    ax.text(0.507, 0.640, "$w_r$", fontsize=7, color=BLUE, ha="left")
+    ax.text(0.768, 0.640, "$w_k$", fontsize=7, color="#c0504d", ha="right")
+    ax.text(0.510, 0.460, "$R$ = 30 rounds × 1 epoch;\nto a plateau: ≤ 500 rounds\nbytes: $P\\cdot b$ per message,\n"
+            "$b$ = 4 (fp32) or 2 (fp16)\nparticipation $C$, stragglers $p_s$\n"
+            "client Adam (reset or kept), SGD;\nserver FedAdam", ha="left", va="top",
+            fontsize=6.3, color=INK, linespacing=1.3)
 
     # 4. evaluation
     box(ax, 0.805, 0.255, 0.185, 0.665, "4. Evaluation",
         ["best round on validation", "one fixed test set", "", "MAE, RMSE, WAPE, MASE",
-         "R@ε, B@ε, excess", "Wilcoxon + Holm", "per household", "", "+ local fine-tuning", "  (FT)"])
+         "R@ε, B@ε, excess", "run-level t-tests", "+ Holm correction", "harm per household", "", "+ local fine-tuning", "  (FT)"])
 
     for x0, x1 in [(0.200, 0.230), (0.470, 0.500), (0.775, 0.805)]:
         arrow(ax, (x0 + 0.002, 0.61), (x1 - 0.002, 0.61))

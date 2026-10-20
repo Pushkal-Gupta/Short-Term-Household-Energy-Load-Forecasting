@@ -88,3 +88,14 @@ same `elsarticle` format and also publishes federated-learning work for energy.
 | Unsupported claims | Every number in the text is a macro generated from the result files; each claim is tied to a table or test. |
 | Single dataset | One dataset, but three independent cohorts; stated as a limitation. |
 | Reproducibility | Code, configs, per-run histories and per-household errors are included. |
+
+## Final corrections (2026-10-20)
+
+- [x] §4.2 effect sizes now from the three-term model quoted there (0.0043 and 0.0008 kWh)
+- [x] Plateau traffic stated as a mean per run (4,711 MB) plus the capped run (6,887 MB) in abstract, §4.2, §5, cover letter and response
+- [x] Fig. 1: run-level t-tests + Holm, ≤ 500 rounds at the plateau, client optimiser variants and FedAdam
+- [x] Fig. 4(b) legend says "never settled", as in the caption
+- [x] Refs [30] and [39]: both DOIs resolve, Crossref metadata match; [39] now gives CCIS vol. 2784
+- [x] README title, authors and corresponding author match the paper; CITATION.cff and .zenodo.json added
+- [ ] Tag a release and archive it on Zenodo (needs the GitHub–Zenodo link on the authors' account), then cite the DOI in Data availability
+- FedAdam step 0.03: kept as reported-but-not-selected (validation chose 0.01)

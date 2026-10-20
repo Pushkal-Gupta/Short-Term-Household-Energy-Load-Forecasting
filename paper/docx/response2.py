@@ -97,7 +97,7 @@ ROWS = [
      "Sections 4.2, 4.4; Tables S2, S5"),
     ("Traffic of the 100-round runs; S7 and Fig. S1 never cited.",
      r"The 100-round runs moved \RvLongKtwentyMB{}, \RvLongKfiftyMB{} and \RvLongKhundredMB{}\,MB at $K=20$, 50 and "
-     r"100, and the plateau runs up to \RvPlhomesKhundredMBtotal{}\,MB; both are in Section 4.2. Fig.~S1 and every "
+     r"100, and the $K=100$ plateau runs with homes \RvPlhomesKhundredMBtotal{}\,MB on average (\RvPlhomesKhundredCapMB{}\,MB for the run stopped at the 500-round cap); both are in Section 4.2. Fig.~S1 and every "
      r"supplementary table or its section are cited from the main text (the former Table S7 is now Table S9).", "Section 4.2"),
     ("§4.3: “every run qualified after the first round (14.3 MB)” contradicts Table 3.",
      r"Removed. Within 20\,\% the control settled after the first round in every seed (\RvHetwindowBtwozero{}\,MB) "
