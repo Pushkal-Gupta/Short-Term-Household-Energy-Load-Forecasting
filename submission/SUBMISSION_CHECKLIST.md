@@ -95,7 +95,7 @@ same `elsarticle` format and also publishes federated-learning work for energy.
 - [x] Plateau traffic stated as a mean per run (4,711 MB) plus the capped run (6,887 MB) in abstract, §4.2, §5, cover letter and response
 - [x] Fig. 1: run-level t-tests + Holm, ≤ 500 rounds at the plateau, client optimiser variants and FedAdam
 - [x] Fig. 4(b) legend says "never settled", as in the caption
-- [x] Refs [30] and [39]: both DOIs resolve, Crossref metadata match; [39] now gives CCIS vol. 2784
+- [x] Refs [30] and [39]: both DOIs resolve, Crossref metadata match; [39] now gives CCIS vol. 2784 and year 2026, as Springer cites it
 - [x] README title, authors and corresponding author match the paper; CITATION.cff and .zenodo.json added
 - [ ] Tag a release and archive it on Zenodo (needs the GitHub–Zenodo link on the authors' account), then cite the DOI in Data availability
 - FedAdam step 0.03: kept as reported-but-not-selected (validation chose 0.01)
