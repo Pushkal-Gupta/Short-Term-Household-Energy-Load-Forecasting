@@ -16,6 +16,9 @@ authors:
     affiliation: "School of Computer Science and Engineering, Vellore Institute of Technology, Vellore, India"
     email: kalaavathi.b@vit.ac.in
     orcid: "https://orcid.org/0000-0003-4027-3137"
+version: "1.0.0"
+doi: "10.5281/zenodo.23493458"
+date-released: "2026-10-20"
 repository-code: "https://github.com/Pushkal-Gupta/Short-Term-Household-Energy-Load-Forecasting"
 keywords:
   - federated learning

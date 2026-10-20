@@ -8,6 +8,9 @@ School of Computer Science and Engineering, Vellore Institute of Technology, Vel
 \*Corresponding author: Kalaavathi B, kalaavathi.b@vit.ac.in  
 ORCID: 0009-0004-7032-6847 (P. Gupta), 0009-0003-0735-264X (V. Kaushik), 0000-0003-4027-3137 (Kalaavathi B)
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23493458.svg)](https://doi.org/10.5281/zenodo.23493458)
+Archived release: v1.0.0 on Zenodo, https://doi.org/10.5281/zenodo.23493458 (all versions).
+
 | | |
 |---|---|
 | **Data** | Low Carbon London (UK Power Networks), half-hourly kWh, 2013; main cohort of 100 standard-tariff homes and two further cohorts |
@@ -264,4 +267,8 @@ CITATION.cff, .zenodo.json   citation metadata for the repository
 
 The LCL data are published by UK Power Networks on the London Datastore under their own licence
 and are not included here. The code is released for research use. Please cite the manuscript if
-you use it; citation metadata for this repository are in [`CITATION.cff`](CITATION.cff).
+you use it; citation metadata for this repository are in [`CITATION.cff`](CITATION.cff). To cite the code:
+
+> Gupta, P., Kaushik, V., Kalaavathi B (2026). Training budget and fragmentation, more than heterogeneity,
+> drive the accuracy cost of federated household load forecasting: code and results (v1.0.0). Zenodo.
+> https://doi.org/10.5281/zenodo.23493458
