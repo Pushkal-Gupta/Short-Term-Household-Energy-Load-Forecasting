@@ -99,3 +99,7 @@ same `elsarticle` format and also publishes federated-learning work for energy.
 - [x] README title, authors and corresponding author match the paper; CITATION.cff and .zenodo.json added
 - [x] Release v1.0.0 (commit 502eda0) archived on Zenodo: concept DOI 10.5281/zenodo.23493458 (v1.0.0: 10.5281/zenodo.23493459), cited in Data availability, cover letter, README and CITATION.cff
 - FedAdam step 0.03: kept as reported-but-not-selected (validation chose 0.01)
+
+## Title change (2026-10-21)
+
+- [x] Title is now "Beyond Data Heterogeneity: Training Budget and Fragmentation in Federated Household Load Forecasting" (manuscript, main.docx/.pdf, cover letter, README); the Zenodo v1.0.0 record keeps its archived title

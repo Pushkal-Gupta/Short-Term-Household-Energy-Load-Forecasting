@@ -1,4 +1,4 @@
-# Training budget and fragmentation, more than heterogeneity, drive the accuracy cost of federated household load forecasting
+# Beyond Data Heterogeneity: Training Budget and Fragmentation in Federated Household Load Forecasting
 
 Code, experiments and manuscript for a controlled, communication-priced study of federated
 short-term load forecasting on the Low Carbon London (LCL) smart-meter data.
